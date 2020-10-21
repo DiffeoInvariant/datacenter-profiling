@@ -74,24 +74,24 @@ def main(argv):
         grad_tol = abs(kwargs.get('tol',1.0e-6))
         def train_step(params,momentums,scales,x,y):
             grads = ml_grad(params,x,y)
-            grads_small = True
+            #grads_small = True
             for k in params:
                 momentums[k] = nesterov_momentum * momentums[k] + (1.0 - nesterov_momentum) * grads[k][0]
                 scales[k] = nesterov_momentum * scales[k] + (1.0 - nesterov_momentum) * grads[k][0] ** 2
                 params[k] -= learning_rate * momentums[k] / np.sqrt(scales[k] + 1.0e-6)
-                if np.linalg.norm(grads[k]) > grad_tol:
-                    grads_small = False
-            return params, momentums, scales, grads_small
+                #if np.linalg.norm(grads[k]) > grad_tol:
+                #    grads_small = False
+            return params, momentums, scales#, grads_small
             
         debug_print = kwargs.get('debug',True)
         print_every = kwargs.get('print_every',50)
         
         for i in range(steps):
-            params, momentum, scales, grads_small = train_step(params, momentum, scales, predictors, target)
+            params, momentum, scales = train_step(params, momentum, scales, predictors, target)
             if debug_print and i % print_every == 0:
                 print(f"Step: {i}. Marginal Likelihood: {-marginal_likelihood(params,predictors,target)}")
-            if grads_small:
-                break
+            #if grads_small:
+            #    break
         if debug_print:
             print(f"Final parameters: \n{params}")
                         
