@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 FLAGS = absl.flags.FLAGS
 
 
-@partial(jax.jit,static_argnums=(0,))
+#@partial(jax.jit,static_argnums=(0,))
 def main(argv):
 
     def build_covariance_matrix(covariance_function, xx, map_to=None):
@@ -72,6 +72,7 @@ def main(argv):
         learning_rate = kwargs.get('learning_rate',0.01)
         nesterov_momentum = min(1.0,kwargs.get('momentum',0.9))
         grad_tol = abs(kwargs.get('tol',1.0e-6))
+        @jax.jit
         def train_step(params,momentums,scales,x,y):
             grads = ml_grad(params,x,y)
             #grads_small = True
