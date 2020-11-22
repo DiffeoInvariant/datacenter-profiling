@@ -18,10 +18,16 @@ From: ubuntu:latest
     export OUTPUT_SVECS=/opt/svecs.bin
 
 
+%setup
+    mkdir -p /tcpaccept_data
+    mkdir -p /tcpconnect_data
+    mkdir -p /tcplife_data
+    mkdir -p /tcpretrans_data
+
 %post
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
-    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran
+    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind
     echo "Installing BCC..."
     git clone https://github.com/iovisor/bcc.git
     mkdir -p bcc/build && cd bcc/build && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
@@ -29,7 +35,7 @@ From: ubuntu:latest
     echo "Installing OpenMPI 4.0.0..."
     export OMPI_DIR=/opt/ompi
     export OMPI_VERSION=4.0.0
-    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-$OMPI_VERSION.tar.bz2
+    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-$OMPI_VERSION.tar.bz2"
     mkdir -p /opt
     mkdir -p /tmp/ompi
     
@@ -41,8 +47,18 @@ From: ubuntu:latest
     
     echo "Installing PETSc and SLEPc..."
     cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc
-    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 --with-cc=clang --with-cxx=clang++ COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt && make install
+    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt
     export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
     
     echo "Compiling svd program..."
-    cd /opt && make svd
+    cd /opt && make PETSC_DIR=/usr/local/petsc  PETSC_ARCH=arch-linux-c-opt svd
+
+
+
+%startscript
+    bcc/tools/tcpaccept > tcpaccept_data/tcpaccept.log &
+    bcc/tools/tcpconnect > tcpconnect_data/tcpconnect.log &
+    bcc/tools/tcpconnlat > tcpconnect_data/tcpconnlat.log &
+    bcc/tools/tcplife > tcplife_data/tcplife.log &
+    bcc/tools/tcpretrans > tcpretrans_data/tcpretrans.log &
+    
