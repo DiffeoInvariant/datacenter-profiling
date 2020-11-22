@@ -1,0 +1,29 @@
+
+
+.PHONY: svd
+
+#default: all
+
+#all: svd
+petsc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/petsc.pc
+PACKAGES := $(petsc.pc)
+CC := $(shell pkg-config --variable=ccompiler $(PACKAGES))
+CFLAGS_OTHER := $(shell pkg-config --cflags-only-other $(PACKAGES))
+CFLAGS := $(shell pkg-config --variable=cflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
+CFLAGS += -std=c99  -I../library/include -fno-omit-frame-pointer
+
+CFLAGS += $(shell pkg-config --cflags-only-I $(PACKAGES))
+LDFLAGS := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
+LDFLAGS += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
+LDLIBS := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
+
+
+include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
+include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscrules
+#include $(SLEPC_DIR)/lib/slepc/conf/slepc_common
+UTILS_DIR=~/datacenter-profiling/utils
+CFLAGS += -I$(UTILS_DIR)
+
+
+svd: svd.c
+	$(LINK.c)  -o $@ $^ $(LDLIBS) -lslepc

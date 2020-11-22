@@ -46,14 +46,15 @@ def main(argv):
         if compute_marginal_likelihood:
             lbda = np.sum( - 0.5 * np.dot(target.T,kinvy) -
                            np.sum(np.log(np.diag(LDLT))) - x.shape[0] * 0.5 * np.log(2 * pi))
-            return - (lbda - np.sum(-0.5*np.log(2 * pi) - np.log(ampl) ** 2))
+            return  -(lbda - np.sum(-0.5*np.log(2 * pi) - np.log(ampl) ** 2))
         
         if test_predictors is not None:
             test_predictors = test_predictors / scale
             cross_cov = ampl * build_covariance_matrix(exp_squared,predictors,test_predictors)
         else:
             cross_cov = base_cov
-            
+
+        LDLT = scipy.linalg.cholesky(train_cov,lower=True)
         mu = np.dot(cross_cov.T,kinvy) + np.mean(target)
         v = scipy.linalg.solve_triangular(LDLT,cross_cov,lower=True)
         cov = ampl * build_covariance_matrix(exp_squared,test_predictors) - np.dot(v.T,v)
@@ -100,6 +101,10 @@ def main(argv):
                     
     def plot_gp_test(params, predictors, target, test_predictors, conf_stds=2.0):
         mu, cov = predict(params, predictors, target, test_predictors)
+        plt.matshow(cov)
+        plt.title('covariance matrix')
+        plt.legend()
+        plt.show()
         std = np.sqrt(np.diag(cov))
         plt.plot(test_predictors,mu,color='green')
         plt.plot(predictors,target,'k.')
@@ -109,18 +114,22 @@ def main(argv):
     n = FLAGS.num_points
     key = random.PRNGKey(0)
     x = (random.uniform(key,shape=(n,1)) * 4.0) + 1
-    y = lambda x: np.sin(x ** 3) + 0.1 * random.normal(key,shape=(x.shape[0],1))
-    yt = np.sin(x ** 3)
+    y = lambda x: np.sin(x) + 0.1 * random.normal(key,shape=(x.shape[0],1))
+    yt = np.sin(x)
     yvals = y(x)
-    x_test = np.linspace(1, 5, 4 * n)[:,None]
+    #x_test = np.linspace(1, 5, 4 * n)[:,None]
+    #plot_gp_test({'amplitude' : np.ones((1,1)),
+    #                                        'noise' : np.zeros((1,1)),
+    #                                        'lengthscale' : 0.01 * np.ones((1,1))},
+   #              x,yvals,x_test)
     optimal_params = train_gp(x,yvals,steps=FLAGS.maxiter,
                               default_pars={'amplitude' : np.ones((1,1)),
-                                            'noise' : np.zeros((1,1)) - 5.,
+                                            'noise' : np.zeros((1,1)),
                                             'lengthscale' : 0.01 * np.ones((1,1))},
                               learning_rate=FLAGS.learning_rate
     )
-    plt.plot(x,yt,'r.',label='true values')
-    plot_gp_test(optimal_params,x,yvals,x_test)
+    #plt.plot(x,yt,color='red',label='true values')
+    #plot_gp_test(optimal_params,x,yvals,x_test)
 
 
 if __name__ == '__main__':
