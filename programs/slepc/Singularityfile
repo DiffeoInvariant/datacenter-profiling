@@ -1,0 +1,48 @@
+Bootstrap: docker
+From: ubuntu:latest
+#from https://sylabs.io/guides/3.3/user-guide/mpi.html
+%files
+    svd.c /opt
+    Makefile /opt
+    ../../tests/bcsstk32.bin /opt
+    ../../tests/bcsstk32.bin.info /opt
+
+%environment
+    export TZ=America/Los_Angeles
+    export OMPI_DIR=/opt/ompi
+    export SINGULARITY_OMPI_DIR=$OMPI_DIR
+    export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
+    export SINGULARITYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+    export INPUT_FILE=/opt/bcsstk32.bin
+    export OUTPUT_SVALS=/opt/svals.bin
+    export OUTPUT_SVECS=/opt/svecs.bin
+
+
+%post
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+    echo "Installing dependencies..."
+    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran
+    echo "Installing BCC..."
+    git clone https://github.com/iovisor/bcc.git
+    mkdir -p bcc/build && cd bcc/build && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
+
+    echo "Installing OpenMPI 4.0.0..."
+    export OMPI_DIR=/opt/ompi
+    export OMPI_VERSION=4.0.0
+    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-$OMPI_VERSION.tar.bz2
+    mkdir -p /opt
+    mkdir -p /tmp/ompi
+    
+    cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
+    cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    export MANPATH=$OMPI_DIR/share/man:$MANPATH
+    
+    echo "Installing PETSc and SLEPc..."
+    cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc
+    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 --with-cc=clang --with-cxx=clang++ COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt && make install
+    export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
+    
+    echo "Compiling svd program..."
+    cd /opt && make svd
