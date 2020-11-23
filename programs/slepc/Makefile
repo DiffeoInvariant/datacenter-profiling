@@ -1,6 +1,6 @@
 
 
-.PHONY: svd parsetest
+.PHONY: svd parsetest webserver
 
 #default: all
 
@@ -30,3 +30,7 @@ svd: svd.c
 
 parsetest: test_parse.c petsc_webserver.c
 	$(LINK.c) -o $@ $^ $(LDLIBS)
+
+
+webserver: petsc_webserver.c petsc_webserver_driver.c
+	$(LINK.c) -o $@ $^ $(LDLIBS) -lSAWs

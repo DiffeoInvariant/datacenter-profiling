@@ -30,12 +30,14 @@ PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *
 
 PetscErrorCode buffer_create(entry_buffer *buf, size_t num_items)
 {
+  size_t i;
   PetscFunctionBeginUser;
   buf->capacity = num_items;
   if (num_items < 2) {
     SETERRQ1(PETSC_COMM_WORLD,1,"Must allocate at least 2 slots in the buffer, not %D",num_items);
   }
-  buf->buf = calloc(num_items,sizeof(PetscBag));
+  PetscCalloc1(num_items,&buf->buf);
+  
   buf->valid_start = 0;
   buf->valid_end = 0;
   buf->num_items = 0;
@@ -44,7 +46,13 @@ PetscErrorCode buffer_create(entry_buffer *buf, size_t num_items)
 
 PetscErrorCode buffer_destroy(entry_buffer *buf)
 {
-  free(&buf->buf);
+  size_t i;
+  for (i=0; i<buf->capacity; ++i) {
+    if (buf->buf[i]) {
+      PetscBagDestroy(&(buf->buf[i]));
+    }
+  }
+  PetscFree(buf->buf);
   buf->valid_start = 0;
   buf->valid_end = 0;
   buf->capacity = 0;
@@ -189,7 +197,8 @@ PetscErrorCode parse_ipv6(const char *str, char *ip)
 
 #define CHECK_TOKEN(str,tok,i) do {		\
   if (!tok) { \
-  SETERRQ2(PETSC_COMM_WORLD,1,"Failed to find expected token number %D in string %s",i,str); \
+  PetscPrintf(PETSC_COMM_WORLD,"Failed to find expected token number %D in string %s\n",i,str); \
+  return i; \
   }\
   } while(0)
 
@@ -340,7 +349,7 @@ PetscErrorCode tcplife_entry_parse_line(tcplife_entry *entry, char *str)
   substr = strtok(NULL,sep);
   CHECK_TOKEN(str,substr,1);
   ierr = PetscStrlen(substr,&len);CHKERRQ(ierr);
-  ierr = PetscStrncpy(entry->comm,substr,len);CHKERRQ(ierr);
+  ierr = PetscStrncpy(entry->comm,substr,len+1);CHKERRQ(ierr);
   substr = strtok(NULL,sep);
   CHECK_TOKEN(str,substr,2);
   entry->ip = atoi(substr);
@@ -374,4 +383,24 @@ PetscErrorCode tcplife_entry_parse_line(tcplife_entry *entry, char *str)
   CHECK_TOKEN(str,substr,9);
   entry->ms = atof(substr);
   PetscFunctionReturn(0);
+}
+
+PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **e, PetscBag *b)
+{
+  return 0;
+}
+
+PetscErrorCode create_tcpretrans_entry_bag(tcpretrans_entry **e, PetscBag *b)
+{
+  return 0;
+}
+
+PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *e, char *b)
+{
+  return 0;
+}
+
+PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b)
+{
+  return 0;
 }

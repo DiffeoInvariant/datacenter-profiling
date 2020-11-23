@@ -7,6 +7,10 @@
 #define IP_ADDR_MAX_LEN 45
 #define COMM_MAX_LEN    PETSC_MAX_PATH_LEN
 
+typedef enum {TCPACCEPT,TCPCONNECT,TCPCONNLAT,TCPLIFE,TCPRETRANS} InputType;
+static const char *InputTypes[] = {"ACCEPT","CONNECT","CONNLAT","LIFE","RETRANS","TCP",0};
+
+
 typedef struct {
   PetscInt pid, ip, rport, lport;
   char     laddr[IP_ADDR_MAX_LEN],raddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN];
@@ -31,10 +35,9 @@ typedef struct {
   char      saddr[IP_ADDR_MAX_LEN],daddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN];
 } tcpconnlat_entry;
 
-extern PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **, PetscBag *);
+extern PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **e, PetscBag *b);
 
-extern PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *, char *);
-
+extern PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b);
 #define TIME_LEN 9
 
 typedef struct {
@@ -53,7 +56,9 @@ typedef struct {
   char     laddr_port[COMM_MAX_LEN],raddr_port[COMM_MAX_LEN],state[COMM_MAX_LEN];/* TODO: find out how long these really should be, cuz this is longer than necessary. not too important though. */
 } tcpretrans_entry;
 
-extern PetscErrorCode create_tcpretrans_entry_bag(tcpretrans_entry **, PetscBag *);
+extern PetscErrorCode create_tcpretrans_entry_bag(tcpretrans_entry **e, PetscBag *b);
+
+extern PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *e, char *b);
 
 
 typedef struct {
