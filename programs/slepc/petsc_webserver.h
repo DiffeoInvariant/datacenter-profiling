@@ -82,7 +82,7 @@ extern PetscBool      buffer_empty(entry_buffer *);
 
 extern PetscErrorCode buffer_get_item(entry_buffer *, PetscBag *);
 
-extern PetscErrorCode buffer_next(entry_buffer *);
+extern PetscErrorCode buffer_pop(entry_buffer *);
 
 
 typedef struct {

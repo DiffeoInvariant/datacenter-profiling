@@ -115,7 +115,7 @@ PetscErrorCode buffer_get_item(entry_buffer *buf, PetscBag *itemptr)
   return 0;
 }
 
-PetscErrorCode buffer_next(entry_buffer *buf)
+PetscErrorCode buffer_pop(entry_buffer *buf)
 {
   PetscBag bag;
   PetscErrorCode ierr;
