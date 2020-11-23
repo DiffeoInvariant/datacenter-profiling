@@ -1,6 +1,6 @@
 
 
-.PHONY: svd
+.PHONY: svd parsetest
 
 #default: all
 
@@ -27,3 +27,6 @@ CFLAGS += -I$(UTILS_DIR)
 
 svd: svd.c
 	$(LINK.c)  -o $@ $^ $(LDLIBS) -lslepc
+
+parsetest: test_parse.c petsc_webserver.c
+	$(LINK.c) -o $@ $^ $(LDLIBS)
