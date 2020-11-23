@@ -33,14 +33,19 @@ typedef struct {
 
 extern PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **, PetscBag *);
 
+extern PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *, char *);
+
+#define TIME_LEN 9
 
 typedef struct {
-  PetscInt  pid,lport,rport,tx_kb,rx_kb;
+  PetscInt  pid,ip,lport,rport,tx_kb,rx_kb;
   PetscReal ms;
-  char      LADDR[IP_ADDR_MAX_LEN],raddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN];
+  char      laddr[IP_ADDR_MAX_LEN],raddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN],time[TIME_LEN];
 } tcplife_entry;
 
 extern PetscErrorCode create_tcplife_entry_bag(tcplife_entry **, PetscBag *);
+
+extern PetscErrorCode tcplife_entry_parse_line(tcplife_entry *, char *);
 
 
 typedef struct {
