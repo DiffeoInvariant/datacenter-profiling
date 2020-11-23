@@ -17,7 +17,7 @@ typedef struct {
 } tcpaccept_entry;
 
 
-extern PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **, PetscBag *);
+extern PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **, PetscBag *, PetscInt);
 extern PetscErrorCode tcpaccept_entry_parse_line(tcpaccept_entry *, char *);
 
 typedef struct {
@@ -25,7 +25,7 @@ typedef struct {
   char     saddr[IP_ADDR_MAX_LEN],daddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN];
 } tcpconnect_entry;
 
-extern PetscErrorCode create_tcpconnect_entry_bag(tcpconnect_entry **, PetscBag *);
+extern PetscErrorCode create_tcpconnect_entry_bag(tcpconnect_entry **, PetscBag *, PetscInt);
 
 extern PetscErrorCode tcpconnect_entry_parse_line(tcpconnect_entry *, char *);
 
@@ -35,7 +35,7 @@ typedef struct {
   char      saddr[IP_ADDR_MAX_LEN],daddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN];
 } tcpconnlat_entry;
 
-extern PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **e, PetscBag *b);
+extern PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **e, PetscBag *b, PetscInt);
 
 extern PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b);
 #define TIME_LEN 9
@@ -46,7 +46,7 @@ typedef struct {
   char      laddr[IP_ADDR_MAX_LEN],raddr[IP_ADDR_MAX_LEN],comm[COMM_MAX_LEN],time[TIME_LEN];
 } tcplife_entry;
 
-extern PetscErrorCode create_tcplife_entry_bag(tcplife_entry **, PetscBag *);
+extern PetscErrorCode create_tcplife_entry_bag(tcplife_entry **, PetscBag *, PetscInt);
 
 extern PetscErrorCode tcplife_entry_parse_line(tcplife_entry *, char *);
 
