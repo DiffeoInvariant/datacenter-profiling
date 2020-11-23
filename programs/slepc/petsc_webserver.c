@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <petscsys.h>
 
+
 PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *bagptr, PetscInt n)
 {
   PetscErrorCode ierr;
@@ -417,4 +418,119 @@ PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *e, char *b)
 PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b)
 {
   return 0;
+}
+
+
+
+
+PetscErrorCode process_data_initialize(process_data *dat)
+{
+  PetscMemzero(dat,sizeof(process_data));
+  return 0;
+}
+
+
+
+
+
+
+PetscErrorCode process_statistics_init(process_statistics *pstats)
+{
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataCreate(&(pstats->ht));CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_add_accept(process_statistics *pstats,
+					     tcpaccept_entry *entry)
+{
+  PetscErrorCode ierr;
+  process_data   pdata;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,entry->pid,&pdata);CHKERRQ(ierr);
+  ++pdata.naccept;
+  if (entry->ip == 4) {
+    ++pdata.nipv4;
+  } else if (entry->ip == 6) {
+    ++pdata.nipv6;
+  }
+  ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_add_connect(process_statistics *pstats,
+					      tcpconnect_entry *entry)
+{
+  PetscErrorCode ierr;
+  process_data   pdata;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,entry->pid,&pdata);CHKERRQ(ierr);
+  ++pdata.nconnect;
+  if (entry->ip == 4) {
+    ++pdata.nipv4;
+  } else if (entry->ip == 6) {
+    ++pdata.nipv6;
+  }
+  ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_add_connlat(process_statistics *pstats,
+					      tcpconnlat_entry *entry)
+{
+  PetscErrorCode ierr;
+  process_data   pdata;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,entry->pid,&pdata);CHKERRQ(ierr);
+  ++pdata.nconnlat;
+  pdata.latms += entry->lat_ms;
+  if (entry->ip == 4) {
+    ++pdata.nipv4;
+  } else if (entry->ip == 6) {
+    ++pdata.nipv6;
+  }
+  ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode process_statistics_add_life(process_statistics *pstats,
+					   tcplife_entry *entry)
+{
+  PetscErrorCode ierr;
+  process_data   pdata;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,entry->pid,&pdata);CHKERRQ(ierr);
+  ++pdata.nlife;
+  pdata.tx_kb += entry->tx_kb;
+  pdata.rx_kb += entry->rx_kb;
+  pdata.lifems += entry->ms;
+  if (entry->ip == 4) {
+    ++pdata.nipv4;
+  } else if (entry->ip == 6) {
+    ++pdata.nipv6;
+  }
+  ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_add_retrans(process_statistics *pstats,
+					      tcpretrans_entry *entry)
+{
+  PetscErrorCode ierr;
+  process_data   pdata;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,entry->pid,&pdata);CHKERRQ(ierr);
+  ++pdata.nretrans;
+  if (entry->ip == 4) {
+    ++pdata.nipv4;
+  } else if (entry->ip == 6) {
+    ++pdata.nipv6;
+  }
+  ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
 }

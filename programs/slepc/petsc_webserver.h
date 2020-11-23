@@ -2,7 +2,8 @@
 #define DCPROF_PETSC_WEBSERVER_H
 #include <petsc.h>
 #include <unistd.h>
-
+#include <petsc/private/hashtable.h>
+#include <petsc/private/hashmap.h>
 
 #define IP_ADDR_MAX_LEN 45
 #define COMM_MAX_LEN    PETSC_MAX_PATH_LEN
@@ -84,6 +85,67 @@ extern PetscErrorCode buffer_get_item(entry_buffer *, PetscBag *);
 
 extern PetscErrorCode buffer_pop(entry_buffer *);
 
+
+
+typedef struct {
+  long long naccept,nconnect,nconnlat,nlife,nretrans,
+            tx_kb,rx_kb,nipv4,nipv6;
+  PetscReal latms,lifems;
+} process_data;
+
+typedef struct {
+  PetscInt  pid;
+  long long tx_kb,rx_kb,n_event;
+  PetscReal avg_latency,avg_lifetime,fraction_ipv6;
+} process_data_summary;
+
+#define pid_hash(pid) pid
+
+
+#define process_data_equal(lhs,rhs) ( lhs.naccept == rhs.naccept && \
+				      lhs.nconnect == rhs.nconnect &&	\
+				      lhs.nconnlat == rhs.nconnlat && \
+				      lhs.nlife == rhs.nlife &&	      \
+				      lhs.tx_kb == rhs.tx_kb && \
+				      lhs.rx_kb == rhs.rx_kb &&	\
+				      lhs.nipv4 == rhs.nipv4 && \
+				      lhs.nipv6 == rhs.nipv6 && \
+				      lhs.latms == rhs.latms && \
+				      lhs.lifems == rhs.lifems)
+
+#define int_equal(lhs,rhs) lhs == rhs
+
+static process_data default_pdata = {0,0,0,0,0,0,0,0,0,0.0,0.0};
+
+PETSC_HASH_MAP(HMapData,PetscInt,process_data,PetscHashInt,int_equal,default_pdata);
+extern PetscErrorCode process_data_initialize(process_data *);
+
+extern PetscReal fraction_ipv6(process_data *);
+
+extern PetscErrorCode create_process_data_bag(process_data **, PetscBag *);
+
+typedef struct {
+  PetscHMapData ht;
+} process_statistics;
+
+extern PetscErrorCode process_statistics_init(process_statistics *);
+
+extern PetscErrorCode process_statistics_destroy(process_statistics *);
+
+extern PetscErrorCode process_statistics_add_accept(process_statistics *,
+						    tcpaccept_entry *);
+
+extern PetscErrorCode process_statistics_add_connect(process_statistics *,
+						     tcpconnect_entry *);
+
+extern PetscErrorCode process_statistics_add_connlat(process_statistics *,
+						     tcpconnlat_entry *);
+
+extern PetscErrorCode process_statistics_add_life(process_statistics *,
+						    tcplife_entry *);
+
+extern PetscErrorCode process_statistics_add_retrans(process_statistics *,
+						     tcpretrans_entry *);
 
 typedef struct {
   FILE *file;

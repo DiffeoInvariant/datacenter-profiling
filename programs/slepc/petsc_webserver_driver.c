@@ -181,7 +181,7 @@ int main(int argc, char **argv)
 	}
 	ires = buffer_try_insert(&buf,bag);
 	if (ires == -1) {
-	  PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.");
+	  PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.\n");
 	} else {
 	  ++nentry;
 	}
