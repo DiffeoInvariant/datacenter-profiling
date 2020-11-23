@@ -3,6 +3,9 @@ From: ubuntu:latest
 #from https://sylabs.io/guides/3.3/user-guide/mpi.html
 %files
     svd.c /opt
+    petsc_webserver.h /opt
+    petsc_webserver.c /opt
+    petsc_webserver_driver.c /opt
     Makefile /opt
     ../../tests/bcsstk32.bin /opt
     ../../tests/bcsstk32.bin.info /opt
@@ -47,11 +50,14 @@ From: ubuntu:latest
     
     echo "Installing PETSc and SLEPc..."
     cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc
-    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt
+    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 --download-saws COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt
     export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
     
     echo "Compiling svd program..."
-    cd /opt && make PETSC_DIR=/usr/local/petsc  PETSC_ARCH=arch-linux-c-opt svd
+    cd /opt && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt svd
+
+    echo "Compiling PETSc webserver..."
+    cd /opt && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt webserver
 
 
 

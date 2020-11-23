@@ -32,7 +32,6 @@ PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *
 
 PetscErrorCode buffer_create(entry_buffer *buf, size_t num_items)
 {
-  size_t i;
   PetscFunctionBeginUser;
   buf->capacity = num_items;
   if (num_items < 2) {
@@ -48,8 +47,8 @@ PetscErrorCode buffer_create(entry_buffer *buf, size_t num_items)
 
 PetscErrorCode buffer_destroy(entry_buffer *buf)
 {
-  size_t i;
-  for (i=0; i<buf->capacity; ++i) {
+  PetscInt i;
+  for (i=buf->valid_start; i<buf->valid_end; ++i) {
     if (buf->buf[i]) {
       PetscBagDestroy(&(buf->buf[i]));
     }
@@ -99,7 +98,7 @@ PetscInt buffer_try_insert(entry_buffer *buf, PetscBag dataptr)
   if (buffer_full(buf)) {
     return -1;
   }
-
+  
   buf->buf[buf->valid_end] = dataptr;
   
   buf->valid_end = (buf->valid_end + 1) % buf->capacity;
@@ -112,14 +111,23 @@ PetscErrorCode buffer_get_item(entry_buffer *buf, PetscBag *itemptr)
   if (buffer_empty(buf)) {
     return 0;
   }
-  *itemptr = buf->buf[buf->valid_end];
+  *itemptr = buf->buf[buf->valid_start];
   return 0;
 }
 
 PetscErrorCode buffer_next(entry_buffer *buf)
 {
-  buf->valid_end = (buf->valid_end + 1) % buf->capacity;
-  return 0;
+  PetscBag bag;
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  /* destroy existing entry */
+  ierr = buffer_get_item(buf,&bag);CHKERRQ(ierr);
+  if (bag) {
+    ierr = PetscBagDestroy(&bag);CHKERRQ(ierr);
+  }
+  buf->valid_start = (buf->valid_start + 1) % buf->capacity;
+  --(buf->num_items);
+  PetscFunctionReturn(0);
 }
   
 long get_file_end_offset(file_wrapper *file)
