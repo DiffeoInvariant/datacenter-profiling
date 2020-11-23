@@ -11,10 +11,15 @@ static const char help[] = "PETSc webserver: \n"
   "-file [filename] : input file\n"
   "-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : what sort of input file\n"
   "--buffer_capcity [capacity] : (optional, default 10,000) size of the buffer (number of entries)\n"
-  "--polling_interval [interval] : (optional, default 2.5) how many seconds to wait before checking the file for more data after reaching the end?\n";
+  "--polling_interval [interval] : (optional, default 2.5) how many seconds to "
+  "       wait before checking the file for more data after reaching the end?\n"
+  "--url_filename [url_filename] : (optional) filename to write the URL of the "
+  "       SAWs server to. Possibly useful if you want to have another program wait for "
+  "       that entry to be written then email/otherwise send it to the user from a remote system.\n";
 
 entry_buffer   buf;
 char           *line;
+file_wrapper   input;
 
 
 PetscErrorCode handle_line(char *line, PetscBag *bagptr, PetscInt nentry, InputType input_type, PetscInt mypid,
@@ -80,6 +85,7 @@ void sigint_handler(int sig_num)
   if (line) {
     free(line);
   }
+  fclose(input.file);
   PetscFinalize();
   exit(sig_num);
 }
@@ -92,8 +98,7 @@ int main(int argc, char **argv)
   size_t         buf_capacity,linesize,nread;
   PetscInt       N,ires,nentry,mypid;
   PetscReal      polling_interval;
-  file_wrapper   input;
-  char           filename[PETSC_MAX_PATH_LEN],sawsurl[256];
+  char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
   PetscBool      has_filename,ignore_entry;
   InputType      input_type;
   tcpaccept_entry *accept_entry;
@@ -118,6 +123,13 @@ int main(int argc, char **argv)
   ierr = PetscOptionsGetInt(NULL,NULL,"--buffer_capacity",&N,&has_filename);CHKERRQ(ierr);
   polling_interval = 2.5;
   ierr = PetscOptionsGetReal(NULL,NULL,"--polling_interval",&polling_interval,&has_filename);
+  ierr = PetscOptionsGetString(NULL,NULL,"--url_filename",url_filename,PETSC_MAX_PATH_LEN,&has_filename);
+  if (has_filename) {
+    FILE *url_file;
+    url_file = fopen(url_filename,"w");
+    fprintf(url_file,"%s\n",sawsurl);
+    fclose(url_file);
+  }
   
   buf_capacity = (size_t)N;
   ierr = buffer_create(&buf,buf_capacity);CHKERRQ(ierr);
@@ -129,7 +141,7 @@ int main(int argc, char **argv)
   getline(&line,&linesize,input.file);
   nentry = 0;
   //PetscPrintf(PETSC_COMM_WORLD,"Creating SAWs viewer.\n");
-  ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
+  //ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
   char obj_name[100];
   while((nread = getline(&line,&linesize,input.file)) != -1) {
     
@@ -154,11 +166,10 @@ int main(int argc, char **argv)
        ++nentry;
      }
   }
-  ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
   PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
   while (!buffer_empty(&buf)) {
     ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-    ierr = PetscBagView(bag,viewer);CHKERRQ(ierr);
+    ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
     ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
     ierr = buffer_pop(&buf);CHKERRQ(ierr);
   }
@@ -189,7 +200,7 @@ int main(int argc, char **argv)
       PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry - old_nentry);
       while (!buffer_empty(&buf)) {
 	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-	ierr = PetscBagView(bag,viewer);CHKERRQ(ierr);
+	ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
 	ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 	ierr = buffer_pop(&buf);CHKERRQ(ierr);
       }
