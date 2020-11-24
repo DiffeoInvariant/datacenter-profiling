@@ -98,6 +98,9 @@ extern PetscErrorCode buffer_get_item(entry_buffer *, PetscBag *);
 
 extern PetscErrorCode buffer_pop(entry_buffer *);
 
+/* gathers all buffer summaries to a buffer on root */
+extern PetscErrorCode buffer_gather_summaries(entry_buffer *);
+
 
 
 typedef struct {
@@ -108,11 +111,13 @@ typedef struct {
 } process_data;
 
 typedef struct {
-  PetscInt  pid;
-  long long tx_kb,rx_kb,n_event;
+  PetscInt  pid,rank;
+  long      tx_kb,rx_kb,n_event;
   PetscReal avg_latency,avg_lifetime,fraction_ipv6;
   char      comm[COMM_MAX_LEN];
 } process_data_summary;
+
+extern PetscErrorCode summary_view(process_data_summary *);
 
 extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_data_summary *);
 

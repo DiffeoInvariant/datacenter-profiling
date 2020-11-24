@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <petscsys.h>
-
-
+#include <limits.h>
+#include <SAWs.h>
+#include <petscviewersaws.h>
 PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *bagptr, PetscInt n)
 {
   PetscErrorCode ierr;
@@ -639,6 +640,7 @@ PetscErrorCode register_mpi_types()
 
 
   MPI_Aint pdata_displacements[] = {offsetof(process_data_summary,pid),
+				    offsetof(process_data_summary,rank),
 				    offsetof(process_data_summary,tx_kb),
 				    offsetof(process_data_summary,rx_kb),
 				    offsetof(process_data_summary,n_event),
@@ -647,13 +649,18 @@ PetscErrorCode register_mpi_types()
 				    offsetof(process_data_summary,fraction_ipv6),
 				    offsetof(process_data_summary,comm)};
 
-  MPI_Datatype pdata_dtypes[] = {MPI_INT,MPI_INT64_T,MPI_INT64_T,MPI_INT64_T,
+  MPI_Datatype pdata_dtypes[] = {MPI_INT,MPI_INT,MPI_LONG,MPI_LONG,MPI_LONG,
 				 MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,MPI_CHAR};
 
   int pdata_block_lens[] = {1,1,1,1,1,1,1,COMM_MAX_LEN};
 
   MPI_Type_create_struct(8,pdata_block_lens,pdata_displacements,pdata_dtypes,
 			 &MPI_DTYPES[DTYPE_SUMMARY]);
+
+  PetscInt i;
+  for (i=0; i<6; ++i) {
+    MPI_Type_commit(&MPI_DTYPES[i]);
+  }
 
   registered = PETSC_TRUE;
   PetscFunctionReturn(0);
@@ -732,6 +739,7 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
   ierr = PetscBagGetData(pbag,(void**)&ps);CHKERRQ(ierr);
   ierr = PetscBagSetName(pbag,obj_name,"A process summary");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt(pbag,&ps->pid,-1,"pid","Process ID");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(pbag,&ps->rank,0,"rank","MPI rank");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->tx_kb,0,"tx_kb","Transmitted kilobytes");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->rx_kb,0,"rx_kb","Received kilobytes");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->n_event,0,"n_event","Number of TCP events (e.g. connect, accept, life, etc.)");CHKERRQ(ierr);
@@ -744,5 +752,113 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
   *psumm = ps;
   PetscFunctionReturn(0);
 }
-  
 
+
+
+PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
+{
+  PetscErrorCode ierr;
+  PetscInt       rank,size,nitem,nextant,summs,i,ires;
+  process_data_summary *summaries=NULL,*summary,*ssummaries;
+  PetscBag             bag;
+  PetscFunctionBeginUser;
+  MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
+  MPI_Comm_size(PETSC_COMM_WORLD,&size);
+  if (size == 1) {
+    /* only one process in the communicator; already on root */
+    PetscFunctionReturn(0);
+  }
+  /* prepare for MPI_Reduce() to get number of summaries coming into root */
+  if (rank) {
+    summs = 0;
+    if (buf->num_items > INT_MAX) {
+      SETERRQ2(PETSC_COMM_WORLD,1,"Number of items %D on rank %D is greater than INT_MAX! Try sending the buffer with fewer items.",buf->num_items,rank);
+    }
+    nitem = (PetscInt)buf->num_items;
+    ierr = PetscCalloc1(nitem,&ssummaries);CHKERRQ(ierr);
+    /* fill the array with summaries */
+    i=0;
+    while (!buffer_empty(buf)) {
+      ierr = buffer_get_item(buf,&bag);CHKERRQ(ierr);
+      ierr = PetscBagGetData(bag,(void**)&summary);CHKERRQ(ierr);
+      ssummaries[i] = *summary;   
+      ierr = buffer_pop(buf);CHKERRQ(ierr);
+      ++i;
+    }
+  } else {
+    nitem = 0;
+    if (buf->num_items > INT_MAX) {
+      SETERRQ2(PETSC_COMM_WORLD,1,"Number of items %D on rank %D is greater than INT_MAX! Try sending the buffer with fewer items.",buf->num_items,rank);
+    }
+    //ierr = PetscCalloc1(size,&summs_per_rank);CHKERRQ(ierr);
+    nextant = (PetscInt)buf->num_items;
+  }
+  MPI_Barrier(PETSC_COMM_WORLD);
+  MPI_Reduce(&nitem,&summs,1,MPI_INT,MPI_SUM,0,PETSC_COMM_WORLD);
+  //MPI_Gather(&nitem,1,MPI_INT,summs_per_rank,1,MPI_INT,0,PETSC_COMM_WORLD);
+
+  if (!rank) {
+    if (nextant + summs >= buf->capacity) {
+      SETERRQ3(PETSC_COMM_WORLD,1,"Buffer on root has capacity %D, but currently holds %D entries and is being asked to accept %D more! Increase the buffer size on root.",buf->capacity,nextant,nitem);
+    }
+    ierr = PetscCalloc1(summs,&summaries);CHKERRQ(ierr);
+  }
+
+  MPI_Barrier(PETSC_COMM_WORLD);
+  MPI_Gather(ssummaries,nitem,MPI_DTYPES[DTYPE_SUMMARY],
+	     summaries,summs,MPI_DTYPES[DTYPE_SUMMARY],
+	     0,PETSC_COMM_WORLD);
+  
+  /* push the new summaries into the buffer */
+  if (!rank) {
+    for (i=0; i<summs; ++i) {
+      ierr = create_process_summary_bag(&summary,&bag,summaries[i].rank,
+					i);
+      //*summary = summaries[i];
+      summary->pid = summaries[i].pid;
+      summary->rank = summaries[i].rank;
+      summary->tx_kb = summaries[i].tx_kb;
+      summary->rx_kb = summaries[i].rx_kb;
+      summary->n_event = summaries[i].n_event;
+      summary->avg_latency = summaries[i].avg_latency;
+      summary->fraction_ipv6 = summaries[i].fraction_ipv6;
+      ierr = PetscStrncpy(summary->comm,summaries[i].comm,COMM_MAX_LEN);CHKERRQ(ierr);
+      
+      ires = buffer_try_insert(buf,bag);
+      if (ires == -1) {
+	PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry\n.");
+      }
+      //ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
+      //ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+      
+    }
+  } 
+
+  MPI_Barrier(PETSC_COMM_WORLD);
+  if (rank) {
+    ierr = PetscFree(ssummaries);CHKERRQ(ierr);
+  } else {
+    ierr = PetscFree(summaries);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
+  
+	     
+	      
+    
+   
+PetscErrorCode summary_view(process_data_summary *psum)
+{
+  PetscFunctionBeginUser;
+  PetscPrintf(PETSC_COMM_WORLD,"Summary of network traffic on rank %D, process %D:\n",psum->rank,psum->pid);
+  PetscPrintf(PETSC_COMM_WORLD,"pid           = %D\n",psum->pid);
+  PetscPrintf(PETSC_COMM_WORLD,"name          = %s\n",psum->comm);
+  PetscPrintf(PETSC_COMM_WORLD,"tx_kb         = %D\n",psum->tx_kb);
+  PetscPrintf(PETSC_COMM_WORLD,"rx_kb         = %D\n",psum->rx_kb);
+  PetscPrintf(PETSC_COMM_WORLD,"n_event       = %D\n",psum->n_event);
+  PetscPrintf(PETSC_COMM_WORLD,"avg_latency   = %g\n",psum->avg_latency);
+  PetscPrintf(PETSC_COMM_WORLD,"avg_lifetime  = %g\n",psum->avg_lifetime);
+  PetscPrintf(PETSC_COMM_WORLD,"fraction_ipv6 = %.3g\n",psum->fraction_ipv6);
+  PetscFunctionReturn(0);
+}

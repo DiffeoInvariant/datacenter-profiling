@@ -174,12 +174,7 @@ int main(int argc, char **argv)
       PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
       return ierr;
     }
-    /*ires = buffer_try_insert(&buf,bag);
-     if (ires == -1) {
-       PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.");
-     } else {
-       ++nentry;
-       }*/
+
     ++nentry;
   }
   PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
@@ -198,15 +193,29 @@ int main(int argc, char **argv)
     } 
   }
 
-  while (!buffer_empty(&buf)) {
-    ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-    ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
-    ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-    ierr = buffer_pop(&buf);CHKERRQ(ierr);
+  if (!rank) {
+    /* print out everything from rank zero */
+    while (!buffer_empty(&buf)) {
+      ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
+      ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
+      ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+      ierr = buffer_pop(&buf);CHKERRQ(ierr);
+    }
+  }
+  
+  ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
+  
+  
+  if (!rank) {
+    while (!buffer_empty(&buf)) {
+      ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
+      ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
+      ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+      ierr = buffer_pop(&buf);CHKERRQ(ierr);
+    }
   }
     
-  ierr = PetscFree(pids);CHKERRQ(ierr);
-  ierr = PetscFree(pdata);CHKERRQ(ierr);
+  MPI_Barrier(PETSC_COMM_WORLD);
 
   size_t old_nentry = nentry;
   /* done with the file; now wait for more data; */
@@ -249,12 +258,15 @@ int main(int argc, char **argv)
 	}
       }
 
-      
-      while (!buffer_empty(&buf)) {
-	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-	ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
-	ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-	ierr = buffer_pop(&buf);CHKERRQ(ierr);
+      ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
+
+      if (!rank) {
+	while (!buffer_empty(&buf)) {
+	  ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
+	  ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
+	  ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+	  ierr = buffer_pop(&buf);CHKERRQ(ierr);
+	}
       }
       old_nentry = nentry;
       /* wait for new entries */
@@ -262,6 +274,8 @@ int main(int argc, char **argv)
     }
   }/* end main event loop */
   //SAWs_Finalize();
+  ierr = PetscFree(pids);CHKERRQ(ierr);
+  ierr = PetscFree(pdata);CHKERRQ(ierr);
   PetscFinalize();
   return 0;
 }
