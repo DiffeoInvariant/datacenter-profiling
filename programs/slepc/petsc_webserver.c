@@ -442,6 +442,13 @@ PetscErrorCode process_statistics_init(process_statistics *pstats)
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode process_statistics_destroy(process_statistics *pstats)
+{
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataDestroy(&(pstats->ht));CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
 
 PetscErrorCode process_statistics_add_accept(process_statistics *pstats,
 					     tcpaccept_entry *entry)
@@ -532,5 +539,99 @@ PetscErrorCode process_statistics_add_retrans(process_statistics *pstats,
     ++pdata.nipv6;
   }
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+static PetscBool registered = PETSC_FALSE;
+PetscErrorCode register_mpi_types()
+{
+  PetscFunctionBeginUser;
+  if (registered) {
+    PetscFunctionReturn(0);
+  }
+  MPI_Aint accept_displacements[] = {offsetof(tcpaccept_entry,pid),
+				     offsetof(tcpaccept_entry,ip),
+				     offsetof(tcpaccept_entry,rport),
+				     offsetof(tcpaccept_entry,lport),
+				     offsetof(tcpaccept_entry,laddr),
+				     offsetof(tcpaccept_entry,raddr),
+				     offsetof(tcpaccept_entry,comm)};
+  MPI_Datatype accept_dtypes[] = {MPI_INT,MPI_INT,MPI_INT,MPI_INT,MPI_CHAR,
+				  MPI_CHAR,MPI_CHAR};
+
+
+  int accept_block_lens[] = {1,1,1,1,IP_ADDR_MAX_LEN,IP_ADDR_MAX_LEN,COMM_MAX_LEN};
+
+  MPI_Type_create_struct(7,accept_block_lens,accept_displacements,accept_dtypes,
+			 &MPI_DTYPES[DTYPE_ACCEPT]);
+
+  MPI_Aint connect_displacements[] = {offsetof(tcpconnect_entry,pid),
+				      offsetof(tcpconnect_entry,ip),
+				      offsetof(tcpconnect_entry,dport),
+				      offsetof(tcpconnect_entry,saddr),
+				      offsetof(tcpconnect_entry,daddr),
+				      offsetof(tcpconnect_entry,comm)};
+
+  MPI_Datatype connect_dtypes[] = {MPI_INT,MPI_INT,MPI_INT,MPI_CHAR,MPI_CHAR,
+				   MPI_CHAR};
+
+  int connect_block_lens[] = {1,1,1,IP_ADDR_MAX_LEN,IP_ADDR_MAX_LEN,
+			      COMM_MAX_LEN};
+
+  MPI_Type_create_struct(6,connect_block_lens,connect_displacements,connect_dtypes,
+			 &MPI_DTYPES[DTYPE_CONNECT]);
+  
+
+  MPI_Aint connlat_displacements[] = {offsetof(tcpconnlat_entry,pid),
+				      offsetof(tcpconnlat_entry,ip),
+				      offsetof(tcpconnlat_entry,dport),
+				      offsetof(tcpconnlat_entry,lat_ms),
+				      offsetof(tcpconnlat_entry,saddr),
+				      offsetof(tcpconnlat_entry,daddr),
+				      offsetof(tcpconnlat_entry,comm)};
+
+  MPI_Datatype connlat_dtypes[] = {MPI_INT,MPI_INT,MPI_INT,
+				   MPI_DOUBLE,MPI_CHAR,MPI_CHAR,MPI_CHAR};
+
+  int connlat_block_lens[] = {1,1,1,1,IP_ADDR_MAX_LEN,IP_ADDR_MAX_LEN,
+			      COMM_MAX_LEN};
+
+  MPI_Type_create_struct(7,connlat_block_lens,connlat_displacements,
+			 connlat_dtypes,&MPI_DTYPES[DTYPE_CONNLAT]);
+
+  MPI_Aint life_displacements[] = {offsetof(tcplife_entry,pid),
+				   offsetof(tcplife_entry,ip),
+				   offsetof(tcplife_entry,lport),
+				   offsetof(tcplife_entry,rport),
+				   offsetof(tcplife_entry,tx_kb),
+				   offsetof(tcplife_entry,rx_kb),
+				   offsetof(tcplife_entry,ms),
+				   offsetof(tcplife_entry,laddr),
+				   offsetof(tcplife_entry,raddr),
+				   offsetof(tcplife_entry,comm),
+				   offsetof(tcplife_entry,time)};
+  MPI_Datatype life_dtypes[] = {MPI_INT,MPI_INT,MPI_INT,MPI_INT,MPI_INT,MPI_INT,
+				MPI_DOUBLE,MPI_CHAR,MPI_CHAR,MPI_CHAR,MPI_CHAR};
+
+  int life_block_lens[] = {1,1,1,1,1,1,1,IP_ADDR_MAX_LEN,IP_ADDR_MAX_LEN,
+			   COMM_MAX_LEN,TIME_LEN};
+
+  MPI_Type_create_struct(11,life_block_lens,life_displacements,life_dtypes,
+			 &MPI_DTYPES[DTYPE_LIFE]);
+
+  MPI_Aint retrans_displacements[] = {offsetof(tcpretrans_entry,pid),
+				      offsetof(tcpretrans_entry,ip),
+				      offsetof(tcpretrans_entry,laddr_port),
+				      offsetof(tcpretrans_entry,raddr_port),
+				      offsetof(tcpretrans_entry,state)};
+  
+  MPI_Datatype retrans_dtypes[] = {MPI_INT,MPI_INT,MPI_CHAR,MPI_CHAR,MPI_CHAR};
+  int retrans_block_lens[] = {1,1,COMM_MAX_LEN,COMM_MAX_LEN,COMM_MAX_LEN};
+
+  MPI_Type_create_struct(5,retrans_block_lens,retrans_displacements,
+			 retrans_dtypes,&MPI_DTYPES[DTYPE_RETRANS]);
+
+  registered = PETSC_TRUE;
   PetscFunctionReturn(0);
 }

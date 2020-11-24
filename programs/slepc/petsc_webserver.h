@@ -11,6 +11,18 @@
 typedef enum {TCPACCEPT,TCPCONNECT,TCPCONNLAT,TCPLIFE,TCPRETRANS} InputType;
 static const char *InputTypes[] = {"ACCEPT","CONNECT","CONNLAT","LIFE","RETRANS","TCP",0};
 
+typedef enum 
+  {
+   DTYPE_ACCEPT=0,
+   DTYPE_CONNECT=1,
+   DTYPE_CONNLAT=2,
+   DTYPE_LIFE=3,
+   DTYPE_RETRANS=4
+  } SERVER_MPI_DTYPES;
+
+MPI_Datatype MPI_DTYPES[5];
+
+extern PetscErrorCode register_mpi_types();
 
 typedef struct {
   PetscInt pid, ip, rport, lport;

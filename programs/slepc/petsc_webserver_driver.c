@@ -96,7 +96,7 @@ int main(int argc, char **argv)
   PetscErrorCode ierr;
   PetscBag       bag;
   size_t         buf_capacity,linesize,nread;
-  PetscInt       N,ires,nentry,mypid;
+  PetscInt       N,ires,nentry,mypid,rank,size;
   PetscReal      polling_interval;
   char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
   PetscBool      has_filename,ignore_entry;
@@ -108,7 +108,10 @@ int main(int argc, char **argv)
   tcpretrans_entry *retrans_entry;
   PetscViewer     viewer;
   ierr = PetscInitialize(&argc,&argv,NULL,help);if (ierr) return ierr;
+  ierr = register_mpi_types();CHKERRQ(ierr);
   mypid = getpid();
+  MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
+  MPI_Comm_size(PETSC_COMM_WORLD,&size);
   line = NULL;
   linesize = 0;
   SAWs_Initialize();
@@ -124,11 +127,13 @@ int main(int argc, char **argv)
   polling_interval = 2.5;
   ierr = PetscOptionsGetReal(NULL,NULL,"--polling_interval",&polling_interval,&has_filename);
   ierr = PetscOptionsGetString(NULL,NULL,"--url_filename",url_filename,PETSC_MAX_PATH_LEN,&has_filename);
-  if (has_filename) {
-    FILE *url_file;
-    url_file = fopen(url_filename,"w");
-    fprintf(url_file,"%s\n",sawsurl);
-    fclose(url_file);
+  if (!rank) {
+    if (has_filename) {
+      FILE *url_file;
+      url_file = fopen(url_filename,"w");
+      fprintf(url_file,"%s\n",sawsurl);
+      fclose(url_file);
+    }
   }
   
   buf_capacity = (size_t)N;
