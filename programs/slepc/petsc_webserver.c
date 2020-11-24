@@ -910,17 +910,17 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
 	      
     
    
-PetscErrorCode summary_view(process_data_summary *psum)
+PetscErrorCode summary_view(FILE *fd, process_data_summary *psum)
 {
   PetscFunctionBeginUser;
-  PetscPrintf(PETSC_COMM_WORLD,"Summary of network traffic on rank %D, process %D:\n",psum->rank,psum->pid);
-  PetscPrintf(PETSC_COMM_WORLD,"pid           = %D\n",psum->pid);
-  PetscPrintf(PETSC_COMM_WORLD,"name          = %s\n",psum->comm);
-  PetscPrintf(PETSC_COMM_WORLD,"tx_kb         = %D\n",psum->tx_kb);
-  PetscPrintf(PETSC_COMM_WORLD,"rx_kb         = %D\n",psum->rx_kb);
-  PetscPrintf(PETSC_COMM_WORLD,"n_event       = %D\n",psum->n_event);
-  PetscPrintf(PETSC_COMM_WORLD,"avg_latency   = %g\n",psum->avg_latency);
-  PetscPrintf(PETSC_COMM_WORLD,"avg_lifetime  = %g\n",psum->avg_lifetime);
-  PetscPrintf(PETSC_COMM_WORLD,"fraction_ipv6 = %.3g\n",psum->fraction_ipv6);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"Summary of network traffic on rank %D, process %D:\n",psum->rank,psum->pid);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"pid           = %D\n",psum->pid);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"name          = %s\n",psum->comm);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"tx_kb         = %D\n",psum->tx_kb);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"rx_kb         = %D\n",psum->rx_kb);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"n_event       = %D\n",psum->n_event);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"avg_latency   = %g\n",psum->avg_latency);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"avg_lifetime  = %g\n",psum->avg_lifetime);
+  PetscFPrintf(PETSC_COMM_WORLD,fd,"fraction_ipv6 = %.3g\n",psum->fraction_ipv6);
   PetscFunctionReturn(0);
 }

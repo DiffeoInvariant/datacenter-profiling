@@ -117,7 +117,7 @@ typedef struct {
   char      comm[COMM_MAX_LEN];
 } process_data_summary;
 
-extern PetscErrorCode summary_view(process_data_summary *);
+extern PetscErrorCode summary_view(FILE *,process_data_summary *);
 
 extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_data_summary *);
 
