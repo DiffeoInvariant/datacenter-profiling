@@ -6,6 +6,8 @@
 #include <limits.h>
 #include <SAWs.h>
 #include <petscviewersaws.h>
+
+
 PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *bagptr, PetscInt n)
 {
   PetscErrorCode ierr;
@@ -401,23 +403,83 @@ PetscErrorCode tcplife_entry_parse_line(tcplife_entry *entry, char *str)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **e, PetscBag *b, PetscInt n)
+PetscErrorCode create_tcpconnlat_entry_bag(tcpconnlat_entry **entryptr, PetscBag *bagptr, PetscInt n)
 {
-  return 0;
+  PetscErrorCode ierr;
+  tcpconnlat_entry *entry;
+  PetscBag        bag;
+  char            obj_name[100];
+  PetscFunctionBeginUser;
+  ierr = PetscBagCreate(PETSC_COMM_WORLD,sizeof(tcpconnlat_entry),&bag);CHKERRQ(ierr);
+  ierr = PetscBagGetData(bag,(void**)&entry);CHKERRQ(ierr);
+  sprintf(obj_name,"tcpconnlat_entry_%d",n);
+  ierr = PetscBagRegisterInt(bag,&entry->pid,-1,"pid","Process ID that accepted the connection");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(bag,&entry->ip,4,"ip","IP address version");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(bag,&entry->dport,0,"dport","Remote port");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->saddr,IP_ADDR_MAX_LEN,"0.0.0.0","saddr","Source IP address");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->daddr,IP_ADDR_MAX_LEN,"0.0.0.0","daddr","Destination IP address");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->comm,COMM_MAX_LEN,"[unknown]","comm","Process name");CHKERRQ(ierr);
+
+  *entryptr = entry;
+  *bagptr = bag;
+  PetscFunctionReturn(0);
 }
 
-PetscErrorCode create_tcpretrans_entry_bag(tcpretrans_entry **e, PetscBag *b)
+PetscErrorCode create_tcpretrans_entry_bag(tcpretrans_entry **entryptr, PetscBag *bagptr, PetscInt n)
 {
-  return 0;
+  PetscErrorCode ierr;
+  tcpretrans_entry *entry;
+  PetscBag        bag;
+  char            obj_name[100];
+  PetscFunctionBeginUser;
+  ierr = PetscBagCreate(PETSC_COMM_WORLD,sizeof(tcpconnlat_entry),&bag);CHKERRQ(ierr);
+  ierr = PetscBagGetData(bag,(void**)&entry);CHKERRQ(ierr);
+  sprintf(obj_name,"tcpconnlat_entry_%d",n);
+  ierr = PetscBagRegisterInt(bag,&entry->pid,-1,"pid","Process ID that accepted the connection");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(bag,&entry->ip,4,"ip","IP address version");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->laddr_port,COMM_MAX_LEN,"0.0.0.0:0","laddr_port","Local IP_address:tcp_port");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->raddr_port,COMM_MAX_LEN,"0.0.0.0:0","raddr_port","Remote IP_address:tcp_port");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(bag,&entry->state,COMM_MAX_LEN,"[unknown]","state","TCP session state");CHKERRQ(ierr);
+
+  *entryptr = entry;
+  *bagptr = bag;
+  PetscFunctionReturn(0);
 }
 
-PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *e, char *b)
+PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *entry, char *str)
 {
-  return 0;
+  PetscErrorCode ierr;
+  char *substr;
+  const char sep[2] = " ";
+  size_t len;
+  PetscFunctionBeginUser;
+  SETERRQ(PETSC_COMM_WORLD,1,"Error, tcpretrans_entry_parse_line() not implemented yet");
+  substr = strtok(str,sep);
+  CHECK_TOKEN(str,substr,0);
+  entry->pid = atoi(substr);
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,1);
+  entry->ip = atoi(substr);
+  while (entry->ip == 0) {
+    /* in case comm has a space */
+    substr = strtok(NULL,sep);
+    CHECK_TOKEN(str,substr,1);
+    entry->ip = atoi(substr);
+  }
+
+
+  strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,4);
+  ierr = PetscStrlen(substr,&len);CHKERRQ(ierr);
+  ierr = PetscStrncpy(entry->state,substr,len+1);CHKERRQ(ierr);
+
+
+  PetscFunctionReturn(0);
 }
 
 PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b)
 {
+  SETERRQ(PETSC_COMM_WORLD,1,"Error, tcpconnlat_entry_parse_line() not implemented yet");
   return 0;
 }
 
