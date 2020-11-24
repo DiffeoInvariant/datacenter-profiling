@@ -17,10 +17,11 @@ typedef enum
    DTYPE_CONNECT=1,
    DTYPE_CONNLAT=2,
    DTYPE_LIFE=3,
-   DTYPE_RETRANS=4
+   DTYPE_RETRANS=4,
+   DTYPE_SUMMARY=5
   } SERVER_MPI_DTYPES;
 
-MPI_Datatype MPI_DTYPES[5];
+MPI_Datatype MPI_DTYPES[6];
 
 extern PetscErrorCode register_mpi_types();
 
@@ -103,13 +104,17 @@ typedef struct {
   long long naccept,nconnect,nconnlat,nlife,nretrans,
             tx_kb,rx_kb,nipv4,nipv6;
   PetscReal latms,lifems;
+  char      comm[COMM_MAX_LEN];
 } process_data;
 
 typedef struct {
   PetscInt  pid;
   long long tx_kb,rx_kb,n_event;
   PetscReal avg_latency,avg_lifetime,fraction_ipv6;
+  char      comm[COMM_MAX_LEN];
 } process_data_summary;
+
+extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_data_summary *);
 
 #define pid_hash(pid) pid
 
@@ -136,13 +141,26 @@ extern PetscReal fraction_ipv6(process_data *);
 
 extern PetscErrorCode create_process_data_bag(process_data **, PetscBag *);
 
+/* the third parameter is the MPI_Comm rank, fourth is the number of the entry*/
+extern PetscErrorCode create_process_summary_bag(process_data_summary **, PetscBag *, PetscInt, PetscInt);
+
 typedef struct {
   PetscHMapData ht;
 } process_statistics;
 
+extern PetscErrorCode process_statistics_get_summary(process_statistics *, PetscInt, process_data_summary *);
+
+extern PetscErrorCode process_statistics_num_entries(process_statistics *, PetscInt *);
+
+/* second and third parameters are pointers to array of process_data and PetscInt (pid) respectively of length retrieved from process_statistics_num_entries() */
+extern PetscErrorCode process_statistics_get_all(process_statistics *, process_data *, PetscInt *);
+
+
 extern PetscErrorCode process_statistics_init(process_statistics *);
 
 extern PetscErrorCode process_statistics_destroy(process_statistics *);
+
+extern PetscErrorCode process_statistics_add_pdata(process_statistics *, process_data *);
 
 extern PetscErrorCode process_statistics_add_accept(process_statistics *,
 						    tcpaccept_entry *);
@@ -159,6 +177,11 @@ extern PetscErrorCode process_statistics_add_life(process_statistics *,
 extern PetscErrorCode process_statistics_add_retrans(process_statistics *,
 						     tcpretrans_entry *);
 
+extern PetscErrorCode process_statistics_get_pid_data(process_statistics *,
+						      PetscInt,
+						      process_data *);
+						      
+
 typedef struct {
   FILE *file;
   long offset;
@@ -170,5 +193,7 @@ extern long get_file_end_offset(file_wrapper *);
 
 /* returns 0 if no new data; if the return value is non-zero, it is the difference between the new and old end-of-file. However, the file is moved back to the old end, so you can read the new data. */
 extern long has_new_data(file_wrapper *);
+
+
 
 #endif

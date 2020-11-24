@@ -20,59 +20,65 @@ static const char help[] = "PETSc webserver: \n"
 entry_buffer   buf;
 char           *line;
 file_wrapper   input;
+process_statistics pstats;
 
-
-PetscErrorCode handle_line(char *line, PetscBag *bagptr, PetscInt nentry, InputType input_type, PetscInt mypid,
-			   tcpaccept_entry **accept_entry, tcpconnect_entry **connect_entry,
-			   tcpconnlat_entry **connlat_entry, tcplife_entry **life_entry,
-			   tcpretrans_entry **retrans_entry, PetscBool *ignore_entry)
+PetscErrorCode handle_line(char *line, PetscInt nentry, InputType input_type, PetscInt mypid,
+			   tcpaccept_entry *accept_entry, tcpconnect_entry *connect_entry,
+			   tcpconnlat_entry *connlat_entry, tcplife_entry *life_entry,
+			   tcpretrans_entry *retrans_entry, PetscBool *ignore_entry,
+			   process_statistics *pstats)
 {
   PetscErrorCode ierr;
   PetscFunctionBeginUser;
   
   switch (input_type) {
     case TCPACCEPT:
-      ierr = create_tcpaccept_entry_bag(accept_entry,bagptr,nentry);CHKERRQ(ierr);
-      ierr = tcpaccept_entry_parse_line(*accept_entry,line); if (ierr) break;
-      if ((*accept_entry)->pid == mypid) {
+      //ierr = create_tcpaccept_entry_bag(accept_entry,bagptr,nentry);CHKERRQ(ierr);
+      ierr = tcpaccept_entry_parse_line(accept_entry,line); if (ierr) break;
+      if ((accept_entry)->pid == mypid) {
 	/* if the traffic came from this program, don't upload it to SAWs */
 	*ignore_entry = PETSC_TRUE;
       }
+      ierr = process_statistics_add_accept(pstats,accept_entry);CHKERRQ(ierr);
       break;
     case TCPCONNECT:
       //PetscPrintf(PETSC_COMM_WORLD,"creating bag %D\n",nentry);
-      ierr = create_tcpconnect_entry_bag(connect_entry,bagptr,nentry);CHKERRQ(ierr);
+      //ierr = create_tcpconnect_entry_bag(connect_entry,bagptr,nentry);CHKERRQ(ierr);
       //PetscPrintf(PETSC_COMM_WORLD,"created bag %D\n",nentry);
-      ierr = tcpconnect_entry_parse_line(*connect_entry,line);if (ierr) break;
+      ierr = tcpconnect_entry_parse_line(connect_entry,line);if (ierr) break;
       //PetscPrintf(PETSC_COMM_WORLD,"parsed bag %D\n",nentry);
-      if ((*connect_entry)->pid == mypid) {
+      if ((connect_entry)->pid == mypid) {
 	/* if the traffic came from this program, don't upload it to SAWs */
 	*ignore_entry = PETSC_TRUE;
       }
+      ierr = process_statistics_add_connect(pstats,connect_entry);CHKERRQ(ierr);
       break;
     case TCPCONNLAT:
-      ierr = create_tcpconnlat_entry_bag(connlat_entry,bagptr,nentry);CHKERRQ(ierr);
-      ierr = tcpconnlat_entry_parse_line(*connlat_entry,line);if (ierr) break;
-      if ((*connlat_entry)->pid == mypid) {
+      //ierr = create_tcpconnlat_entry_bag(connlat_entry,bagptr,nentry);CHKERRQ(ierr);
+      ierr = tcpconnlat_entry_parse_line(connlat_entry,line);if (ierr) break;
+      if ((connlat_entry)->pid == mypid) {
 	/* if the traffic came from this program, don't upload it to SAWs */
 	*ignore_entry = PETSC_TRUE;
       }
+      ierr = process_statistics_add_connlat(pstats,connlat_entry);CHKERRQ(ierr);
       break;
     case TCPLIFE:
-      ierr = create_tcplife_entry_bag(life_entry,bagptr,nentry);CHKERRQ(ierr);
-      ierr = tcplife_entry_parse_line(*life_entry,line);if (ierr) break;
-      if ((*life_entry)->pid == mypid) {
+      //ierr = create_tcplife_entry_bag(life_entry,bagptr,nentry);CHKERRQ(ierr);
+      ierr = tcplife_entry_parse_line(life_entry,line);if (ierr) break;
+      if ((life_entry)->pid == mypid) {
 	/* if the traffic came from this program, don't upload it to SAWs */
 	*ignore_entry = PETSC_TRUE;
       }
+      ierr = process_statistics_add_life(pstats,life_entry);CHKERRQ(ierr);
       break;
     case TCPRETRANS:
-      ierr = create_tcpretrans_entry_bag(retrans_entry,bagptr);CHKERRQ(ierr);
-      ierr = tcpretrans_entry_parse_line(*retrans_entry,line);if (ierr) break;
-      if ((*retrans_entry)->pid == mypid) {
+      //ierr = create_tcpretrans_entry_bag(retrans_entry,bagptr);CHKERRQ(ierr);
+      ierr = tcpretrans_entry_parse_line(retrans_entry,line);if (ierr) break;
+      if ((retrans_entry)->pid == mypid) {
 	/* if the traffic came from this program, don't upload it to SAWs */
 	*ignore_entry = PETSC_TRUE;
       }
+      ierr = process_statistics_add_retrans(pstats,retrans_entry);CHKERRQ(ierr);
       break;
     }
 
@@ -86,6 +92,7 @@ void sigint_handler(int sig_num)
     free(line);
   }
   fclose(input.file);
+  process_statistics_destroy(&pstats);
   PetscFinalize();
   exit(sig_num);
 }
@@ -96,17 +103,20 @@ int main(int argc, char **argv)
   PetscErrorCode ierr;
   PetscBag       bag;
   size_t         buf_capacity,linesize,nread;
-  PetscInt       N,ires,nentry,mypid,rank,size;
+  PetscInt       N,ires,nentry,mypid,rank,size,num_pid,i,*pids;
   PetscReal      polling_interval;
   char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
   PetscBool      has_filename,ignore_entry;
   InputType      input_type;
-  tcpaccept_entry *accept_entry;
-  tcpconnect_entry *connect_entry;
-  tcpconnlat_entry *connlat_entry;
-  tcplife_entry *life_entry;
-  tcpretrans_entry *retrans_entry;
+  tcpaccept_entry accept_entry;
+  tcpconnect_entry connect_entry;
+  tcpconnlat_entry connlat_entry;
+  tcplife_entry life_entry;
+  tcpretrans_entry retrans_entry;
   PetscViewer     viewer;
+  
+  process_data       *pdata;
+  process_data_summary *psumm;
   ierr = PetscInitialize(&argc,&argv,NULL,help);if (ierr) return ierr;
   ierr = register_mpi_types();CHKERRQ(ierr);
   mypid = getpid();
@@ -145,16 +155,16 @@ int main(int argc, char **argv)
   getline(&line,&linesize,input.file);
   getline(&line,&linesize,input.file);
   nentry = 0;
+  ierr = process_statistics_init(&pstats);CHKERRQ(ierr);
   //PetscPrintf(PETSC_COMM_WORLD,"Creating SAWs viewer.\n");
   //ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
-  char obj_name[100];
   while((nread = getline(&line,&linesize,input.file)) != -1) {
     
     /* TODO: preallocate the PetscBag instances in the buffer constructor */
     
-    ierr = handle_line(line,&bag,nentry,input_type,mypid,&accept_entry,
+    ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
 		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
-		       &ignore_entry);CHKERRQ(ierr);
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
     if (ignore_entry) {
       PetscPrintf(PETSC_COMM_WORLD,"Ignoring entry\n");
       continue;
@@ -164,28 +174,48 @@ int main(int argc, char **argv)
       PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
       return ierr;
     }
-    ires = buffer_try_insert(&buf,bag);
+    /*ires = buffer_try_insert(&buf,bag);
      if (ires == -1) {
        PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.");
      } else {
        ++nentry;
-     }
+       }*/
+    ++nentry;
   }
   PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
+
+  ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
+  ierr = PetscCalloc1(num_pid,&pids);CHKERRQ(ierr);
+  ierr = PetscCalloc1(num_pid,&pdata);CHKERRQ(ierr);
+  //ierr = PetscCalloc1(num_pid,&psumm);CHKERRQ(ierr);
+  ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
+  for (i=0; i<num_pid; ++i) {
+    ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
+    ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
+    ires = buffer_try_insert(&buf,bag);
+    if (ires == -1) {
+      PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
+    } 
+  }
+
   while (!buffer_empty(&buf)) {
     ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
     ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
     ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
     ierr = buffer_pop(&buf);CHKERRQ(ierr);
   }
+    
+  ierr = PetscFree(pids);CHKERRQ(ierr);
+  ierr = PetscFree(pdata);CHKERRQ(ierr);
+
   size_t old_nentry = nentry;
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
     if (has_new_data(&input)) {
       while ((nread = getline(&line,&linesize,input.file)) != -1) {
-	ierr = handle_line(line,&bag,nentry,input_type,mypid,&accept_entry,
+	ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
 		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
-		       &ignore_entry);CHKERRQ(ierr);
+			   &ignore_entry,&pstats);CHKERRQ(ierr);
 	if (ignore_entry) {
 	  PetscPrintf(PETSC_COMM_WORLD,"Ignoring entry\n");
 	  continue;
@@ -195,14 +225,31 @@ int main(int argc, char **argv)
 	  PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
 	  return ierr;
 	}
+	/*
 	ires = buffer_try_insert(&buf,bag);
 	if (ires == -1) {
 	  PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.\n");
 	} else {
 	  ++nentry;
-	}
+	  }*/
+	++nentry;
       }
       PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry - old_nentry);
+      ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
+      ierr = PetscRealloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
+      ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+      ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
+
+      for (i=0; i<num_pid; ++i) {
+	ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
+	ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
+	ires = buffer_try_insert(&buf,bag);
+	if (ires == -1) {
+	  PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
+	}
+      }
+
+      
       while (!buffer_empty(&buf)) {
 	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
 	ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);

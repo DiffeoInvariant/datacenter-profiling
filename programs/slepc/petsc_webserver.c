@@ -463,6 +463,7 @@ PetscErrorCode process_statistics_add_accept(process_statistics *pstats,
   } else if (entry->ip == 6) {
     ++pdata.nipv6;
   }
+  PetscStrncpy(pdata.comm,entry->comm,COMM_MAX_LEN);
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -481,6 +482,7 @@ PetscErrorCode process_statistics_add_connect(process_statistics *pstats,
   } else if (entry->ip == 6) {
     ++pdata.nipv6;
   }
+  PetscStrncpy(pdata.comm,entry->comm,COMM_MAX_LEN);
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -500,6 +502,7 @@ PetscErrorCode process_statistics_add_connlat(process_statistics *pstats,
   } else if (entry->ip == 6) {
     ++pdata.nipv6;
   }
+  PetscStrncpy(pdata.comm,entry->comm,COMM_MAX_LEN);
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -520,6 +523,7 @@ PetscErrorCode process_statistics_add_life(process_statistics *pstats,
   } else if (entry->ip == 6) {
     ++pdata.nipv6;
   }
+  PetscStrncpy(pdata.comm,entry->comm,COMM_MAX_LEN);
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -538,6 +542,7 @@ PetscErrorCode process_statistics_add_retrans(process_statistics *pstats,
   } else if (entry->ip == 6) {
     ++pdata.nipv6;
   }
+  PetscStrncpy(pdata.comm,"[unknown]",sizeof("[unknown]"));
   ierr = PetscHMapDataSet(pstats->ht,entry->pid,pdata);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -632,6 +637,112 @@ PetscErrorCode register_mpi_types()
   MPI_Type_create_struct(5,retrans_block_lens,retrans_displacements,
 			 retrans_dtypes,&MPI_DTYPES[DTYPE_RETRANS]);
 
+
+  MPI_Aint pdata_displacements[] = {offsetof(process_data_summary,pid),
+				    offsetof(process_data_summary,tx_kb),
+				    offsetof(process_data_summary,rx_kb),
+				    offsetof(process_data_summary,n_event),
+				    offsetof(process_data_summary,avg_latency),
+				    offsetof(process_data_summary,avg_lifetime),
+				    offsetof(process_data_summary,fraction_ipv6),
+				    offsetof(process_data_summary,comm)};
+
+  MPI_Datatype pdata_dtypes[] = {MPI_INT,MPI_INT64_T,MPI_INT64_T,MPI_INT64_T,
+				 MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,MPI_CHAR};
+
+  int pdata_block_lens[] = {1,1,1,1,1,1,1,COMM_MAX_LEN};
+
+  MPI_Type_create_struct(8,pdata_block_lens,pdata_displacements,pdata_dtypes,
+			 &MPI_DTYPES[DTYPE_SUMMARY]);
+
   registered = PETSC_TRUE;
   PetscFunctionReturn(0);
 }
+
+
+PetscErrorCode process_data_summarize(PetscInt pid, process_data *pdata, process_data_summary *psumm)
+{
+  PetscFunctionBeginUser;
+  psumm->pid = pid;
+  psumm->tx_kb = pdata->tx_kb;
+  psumm->rx_kb = pdata->rx_kb;
+  psumm->n_event = pdata->naccept + pdata->nconnect + pdata->nconnlat
+    + pdata->nlife + pdata->nretrans;
+  psumm->avg_latency = pdata->latms / pdata->nconnlat;
+  psumm->avg_lifetime = pdata->lifems / pdata->nlife;
+  psumm->fraction_ipv6 = ((PetscReal)(pdata->nipv6))/ ((PetscReal)(pdata->nipv6) + (PetscReal)(pdata->nipv4));
+  PetscStrncpy(psumm->comm,pdata->comm,COMM_MAX_LEN);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_get_summary(process_statistics *pstats, PetscInt pid, process_data_summary *psumm)
+{
+  process_data pdata;
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,pid,&pdata);CHKERRQ(ierr);
+  ierr = process_data_summarize(pid,&pdata,psumm);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode process_statistics_get_pid_data(process_statistics *pstats,
+					       PetscInt pid,
+					       process_data *pdata)
+{
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGet(pstats->ht,pid,pdata);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode process_statistics_num_entries(process_statistics *pstats, PetscInt *n)
+{
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGetSize(pstats->ht,n);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+
+
+  
+PetscErrorCode process_statistics_get_all(process_statistics *pstats, process_data *pdatas, PetscInt *pids)
+{
+  PetscErrorCode ierr;
+  PetscInt off=0;
+  PetscFunctionBeginUser;
+  ierr = PetscHMapDataGetPairs(pstats->ht,&off,pids,pdatas);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+    
+
+
+PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag *bag, PetscInt rank, PetscInt nentry)
+{
+  PetscErrorCode ierr;
+  process_data_summary *ps;
+  PetscBag pbag;
+  char obj_name[100];
+  PetscFunctionBeginUser;
+  sprintf(obj_name,"process_data_summary_rank_%d_n_%d",rank,nentry);
+  ierr = PetscBagCreate(PETSC_COMM_WORLD,sizeof(process_data_summary),&pbag);CHKERRQ(ierr);
+  ierr = PetscBagGetData(pbag,(void**)&ps);CHKERRQ(ierr);
+  ierr = PetscBagSetName(pbag,obj_name,"A process summary");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(pbag,&ps->pid,-1,"pid","Process ID");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt64(pbag,&ps->tx_kb,0,"tx_kb","Transmitted kilobytes");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt64(pbag,&ps->rx_kb,0,"rx_kb","Received kilobytes");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt64(pbag,&ps->n_event,0,"n_event","Number of TCP events (e.g. connect, accept, life, etc.)");CHKERRQ(ierr);
+  ierr = PetscBagRegisterReal(pbag,&ps->avg_latency,0.0,"avg_latency","Average connection latency from tcpconnlat");CHKERRQ(ierr);
+  ierr = PetscBagRegisterReal(pbag,&ps->avg_lifetime,0.0,"avg_lifetime","Average lifetime of a TCP event from tcplife");CHKERRQ(ierr);
+  ierr = PetscBagRegisterReal(pbag,&ps->fraction_ipv6,0.0,"fraction_ipv6","Fraction of the TCP events that used IP v6 instead of v4");CHKERRQ(ierr);
+  ierr = PetscBagRegisterString(pbag,&ps->comm,COMM_MAX_LEN,"[unknown]","comm","Process name");CHKERRQ(ierr);
+
+  *bag = pbag;
+  *psumm = ps;
+  PetscFunctionReturn(0);
+}
+  
+
