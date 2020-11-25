@@ -1,10 +1,11 @@
 import os
 import sys
-from flask import Flask, request
+from flask import Flask, request, Response
 import re
 import math
 import time
 import argparse
+import jsonpickle
 
 app = Flask(__name__)
 
@@ -13,6 +14,7 @@ entries = {}
 datafile = '/opt/tcpsummary'
 
 def read_file(filename):
+    global entries
     lines = open(filename,'r').readlines()
     lines_per_entry = 7 #7 data fields and a header
     N = len(lines)
@@ -64,8 +66,7 @@ def read_file(filename):
 
 
 
-def format_entries():
-    def format_entry(entry):
+def format_entry(entry):
         ipentry = f"{(100 * entry[6]):2.2f} " if entry[6] == 0.0 else f"{(100 * entry[6]):2.2f}"
         fstr = f"""
 _________________________________________________________________
@@ -81,10 +82,10 @@ _________________________________________________________________
         """
         return fstr
 
+def format_entries():
     entry_ls = []
     for rk in entries:
         rk_entries = []
-        #print(f"entries[{rk}] = {entries[rk]}")
         for pid in entries[rk]:
             rk_entries.append(format_entry(entries[rk][pid]))
         entry_ls.append('\n'.join(rk_entries))
@@ -99,7 +100,35 @@ def root():
     read_file(datafile)
     return format_entries()
     
-    
+
+@app.route('/api/get/all',methods=['GET'])
+def get_all():
+    read_file(datafile)
+    resp = format_entries()
+    return Response(response=jsonpickle.encode({'response' : resp}),status=200,mimetype='application/json')
+
+
+def key_not_found_response(key,dname):
+    resp = f"Key {key} not found in dictionary {dname}!"
+    return Response(response=jsonpickle.encode({'error' : resp}),status=404,mimetype='application/json')
+
+@app.route('/api/get/<int:rank>/<int:pid>',methods=['GET'])
+def get(rank,pid):
+    read_file(datafile)
+    try:
+        entry = entries[rk]
+    except KeyError:
+        return key_not_found_response(rk,'entries')
+
+    try:
+        entry = entry[pid]
+    except KeyError:
+        return key_not_found_response(pid,f"entries[{rk}]")
+
+    resp = format_entry(entry)
+    return Response(response=jsonpickle.encode({'response' : resp}),status=200,mimetype='application/json')
+                    
+        
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -9,6 +9,7 @@ From: ubuntu:latest
     Makefile /opt
     ../../tests/bcsstk32.bin /opt
     ../../tests/bcsstk32.bin.info /opt
+    petsc_webserver_backend.py /opt
 
 %environment
     export TZ=America/Los_Angeles
@@ -31,6 +32,7 @@ From: ubuntu:latest
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
     apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind
+    pip3 install --upgrade flask jsonpickle
     echo "Installing BCC..."
     git clone https://github.com/iovisor/bcc.git
     mkdir -p bcc/build && cd bcc/build && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
@@ -68,9 +70,11 @@ From: ubuntu:latest
 
 
 %startscript
-    bcc/tools/tcpaccept > tcpaccept_data/tcpaccept.log &
-    bcc/tools/tcpconnect > tcpconnect_data/tcpconnect.log &
-    bcc/tools/tcpconnlat > tcpconnect_data/tcpconnlat.log &
-    bcc/tools/tcplife > tcplife_data/tcplife.log &
-    bcc/tools/tcpretrans > tcpretrans_data/tcpretrans.log &
+    tcpaccept > tcpaccept_data/tcpaccept.log &
+    tcpconnect > tcpconnect_data/tcpconnect.log &
+    tcpconnlat > tcpconnect_data/tcpconnlat.log &
+    tcplife > tcplife_data/tcplife.log &
+    tcpretrans > tcpretrans_data/tcpretrans.log &
+    /opt/ngrok http 5000 &
+    
     
