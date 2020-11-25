@@ -121,7 +121,9 @@ void sigint_handler(int sig_num)
   if (line) {
     free(line);
   }
-  fclose(input.file);
+  if (input.file) {
+    fclose(input.file);
+  }
   process_statistics_destroy(&pstats);
   PetscFinalize();
   exit(sig_num);
