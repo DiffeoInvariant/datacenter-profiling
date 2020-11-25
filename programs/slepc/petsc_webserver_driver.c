@@ -21,8 +21,10 @@ static const char help[] = "PETSc webserver: \n";
 
 entry_buffer   buf;
 char           *line;
-file_wrapper   input;
+file_wrapper   input, accept_input, connect_input, connlat_input, life_input, retrans_input;
 process_statistics pstats;
+  
+
 
 PetscErrorCode handle_line(char *line, PetscInt nentry, InputType input_type, PetscInt mypid,
 			   tcpaccept_entry *accept_entry, tcpconnect_entry *connect_entry,
@@ -81,6 +83,38 @@ PetscErrorCode handle_line(char *line, PetscInt nentry, InputType input_type, Pe
   PetscFunctionReturn(0);
 }
 
+
+PetscErrorCode read_file(FILE *fd, size_t *linesize, char **line, PetscInt *nentry, InputType input_type, PetscInt mypid,
+			   tcpaccept_entry *accept_entry, tcpconnect_entry *connect_entry,
+			   tcpconnlat_entry *connlat_entry, tcplife_entry *life_entry,
+			   tcpretrans_entry *retrans_entry, PetscBool *ignore_entry,
+			   process_statistics *pstats)
+{
+  size_t nread;
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  /* skip header lines */
+  getline(line,linesize,fd);
+  getline(line,linesize,fd);
+  *nentry = 0;
+
+  while ((nread = getline(line,linesize,fd)) != -1) {
+    ierr = handle_line(*line,*nentry,input_type,
+		       mypid,accept_entry,connect_entry,
+		       connlat_entry,life_entry,retrans_entry,
+		       ignore_entry,pstats);CHKERRQ(ierr);
+    if (*ignore_entry) {
+      PetscFPrintf(PETSC_COMM_WORLD,stderr,"Ignoring entry\n");
+      *ignore_entry = PETSC_FALSE;
+      continue;
+    } else {
+      ++(*nentry);
+    }
+  }
+  PetscFPrintf(PETSC_COMM_WORLD,stderr,"Handled %D entries.\n",*nentry);
+  PetscFunctionReturn(0);
+}
+
 void sigint_handler(int sig_num)
 {
   buffer_destroy(&buf);
@@ -102,9 +136,11 @@ int main(int argc, char **argv)
   PetscInt       N,ires,nentry,mypid,rank,size,num_pid,i,*pids;
   PetscReal      polling_interval;
   char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
-  char           tempfile_path[] = "/tmp/petsc_webserver_XXXXXX",output_filename[PETSC_MAX_PATH_LEN];
+  char           accept_filename[PETSC_MAX_PATH_LEN], connect_filename[PETSC_MAX_PATH_LEN],
+                 connlat_filename[PETSC_MAX_PATH_LEN], output_filename[PETSC_MAX_PATH_LEN],
+                 life_filename[PETSC_MAX_PATH_LEN], retrans_filename[PETSC_MAX_PATH_LEN];
   FILE           *output;
-  PetscBool      has_filename,has_filename2,ignore_entry;
+  PetscBool      has_filename,has_filename2,ignore_entry,has_accept,has_connect,has_connlat,has_life,has_retrans,has_input_filename;
   InputType      input_type;
   tcpaccept_entry accept_entry;
   tcpconnect_entry connect_entry;
@@ -121,13 +157,21 @@ int main(int argc, char **argv)
   MPI_Comm_size(PETSC_COMM_WORLD,&size);
   line = NULL;
   linesize = 0;
-  SAWs_Initialize();
-  SAWs_Set_Use_Logfile("SAWs.log");
-  SAWs_Get_FullURL(sizeof(sawsurl),sawsurl);
-  PetscPrintf(PETSC_COMM_WORLD,"SAWs is uploading to %s from process number %D\n",sawsurl,mypid);
-  ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_filename);CHKERRQ(ierr);
-  if (!has_filename) {
-    SETERRQ(PETSC_COMM_WORLD,1,"Must provide a filename (-file)");
+
+  has_filename = has_filename2 = ignore_entry = has_accept = has_connect = has_connlat = has_life = has_retrans = has_input_filename = PETSC_FALSE;
+  
+  //SAWs_Initialize();
+  //SAWs_Set_Use_Logfile("SAWs.log");
+  //SAWs_Get_FullURL(sizeof(sawsurl),sawsurl);
+  //PetscPrintf(PETSC_COMM_WORLD,"SAWs is uploading to %s from process number %D\n",sawsurl,mypid);
+  ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_input_filename);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"--accept_file",accept_filename,PETSC_MAX_PATH_LEN,&has_accept);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"--connect_file",connect_filename,PETSC_MAX_PATH_LEN,&has_connect);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"--connlat_file",connlat_filename,PETSC_MAX_PATH_LEN,&has_connlat);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"--life_file",life_filename,PETSC_MAX_PATH_LEN,&has_life);CHKERRQ(ierr);
+  ierr = PetscOptionsGetString(NULL,NULL,"--retrans_file",retrans_filename,PETSC_MAX_PATH_LEN,&has_retrans);CHKERRQ(ierr);
+  if (!(has_input_filename || has_accept || has_connect || has_connlat || has_life || has_retrans)) {
+    SETERRQ(PETSC_COMM_WORLD,1,"Must provide an input filename (-file and -type and/or any of --accept_file,--connect_file,etc.)");
   }
   ierr = PetscOptionsGetString(NULL,NULL,"-o",output_filename,PETSC_MAX_PATH_LEN,&has_filename);CHKERRQ(ierr);
   if (!has_filename) {
@@ -162,29 +206,75 @@ int main(int argc, char **argv)
   ierr = buffer_create(&buf,buf_capacity);CHKERRQ(ierr);
   signal(SIGINT,sigint_handler);
   ierr = PetscOptionsGetEnum(NULL,NULL,"-type",InputTypes,(PetscEnum*)&input_type,&has_filename);CHKERRQ(ierr);
-  input.file = fopen(filename,"r");
-  getline(&line,&linesize,input.file);
-  getline(&line,&linesize,input.file);
-  nentry = 0;
   ierr = process_statistics_init(&pstats);CHKERRQ(ierr);
-  //PetscPrintf(PETSC_COMM_WORLD,"Creating SAWs viewer.\n");
-  ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
-  while((nread = getline(&line,&linesize,input.file)) != -1) {
+  /* read each file */
+  if (has_input_filename) {
+    input.file = fopen(filename,"r");
+    /*
+    getline(&line,&linesize,input.file);
+    getline(&line,&linesize,input.file);
+    nentry = 0;
     
-    ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
-		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
-		       &ignore_entry,&pstats);CHKERRQ(ierr);
-    if (ignore_entry) {
-      PetscFPrintf(PETSC_COMM_WORLD,stderr,"Ignoring entry\n");
-      continue;
+    //PetscPrintf(PETSC_COMM_WORLD,"Creating SAWs viewer.\n");
+    //ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
+    while((nread = getline(&line,&linesize,input.file)) != -1) {
+      ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
+			 &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+			 &ignore_entry,&pstats);CHKERRQ(ierr);
+      if (ignore_entry) {
+	PetscFPrintf(PETSC_COMM_WORLD,stderr,"Ignoring entry\n");
+	ignore_entry = PETSC_FALSE;
+	continue;
+      } else {
+	++nentry;
+      }
     }
-    
+    PetscFPrintf(PETSC_COMM_WORLD,stderr,"Handled %D entries.\n",nentry);
+    */
+    ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
+  } /* if has_input_filename */
 
-    ++nentry;
+  if (has_accept) {
+    accept_input.file = fopen(accept_filename,"r");
+    ierr = read_file(accept_input.file,&linesize,&line,&nentry,TCPACCEPT,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
   }
-  PetscFPrintf(PETSC_COMM_WORLD,stderr,"Handled %D entries.\n",nentry);
+
+  if (has_connect) {
+    connect_input.file = fopen(connect_filename,"r");
+    ierr = read_file(connect_input.file,&linesize,&line,&nentry,TCPCONNECT,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
+  }
+
+  if (has_connlat) {
+    connlat_input.file = fopen(connlat_filename,"r");
+    ierr = read_file(connlat_input.file,&linesize,&line,&nentry,TCPCONNLAT,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
+  }
+
+  if (has_life) {
+    life_input.file = fopen(life_filename,"r");
+    ierr = read_file(life_input.file,&linesize,&line,&nentry,TCPLIFE,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
+  }
+
+  if (has_retrans) {
+    retrans_input.file = fopen(retrans_filename,"r");
+    ierr = read_file(retrans_input.file,&linesize,&line,&nentry,TCPRETRANS,mypid,&accept_entry,
+		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		     &ignore_entry,&pstats);CHKERRQ(ierr);
+  }
+  
+
 
   ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
+  /* done with input files */
   ierr = PetscCalloc1(num_pid,&pids);CHKERRQ(ierr);
   ierr = PetscCalloc1(num_pid,&pdata);CHKERRQ(ierr);
   //ierr = PetscCalloc1(num_pid,&psumm);CHKERRQ(ierr);
@@ -218,65 +308,80 @@ int main(int argc, char **argv)
       ierr = buffer_pop(&buf);CHKERRQ(ierr);
     }
   }
-    
+  if (!rank) {
+    if (output != stdout && output != stderr) {
+      fclose(output);
+    }
+  }
+					    
   MPI_Barrier(PETSC_COMM_WORLD);
 
-  size_t old_nentry = nentry;
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
-    if (has_new_data(&input)) {
-      while ((nread = getline(&line,&linesize,input.file)) != -1) {
-	ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
-		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
-			   &ignore_entry,&pstats);CHKERRQ(ierr);
-	if (ignore_entry) {
-	  PetscPrintf(PETSC_COMM_WORLD,"Ignoring entry\n");
-	  continue;
-	}
-	
-	if (ierr) {
-	  PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry);
-	  return ierr;
-	}
-	/*
-	ires = buffer_try_insert(&buf,bag);
-	if (ires == -1) {
-	  PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry.\n");
-	} else {
-	  ++nentry;
-	  }*/
-	++nentry;
-      }
-      PetscPrintf(PETSC_COMM_WORLD,"Handled %D entries.\n",nentry - old_nentry);
-      ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
-      ierr = PetscRealloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
-      ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
-      ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
-
-      for (i=0; i<num_pid; ++i) {
-	ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
-	ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
-	ires = buffer_try_insert(&buf,bag);
-	if (ires == -1) {
-	  PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
-	}
-      }
-
-      ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
-
-      if (!rank) {
-	while (!buffer_empty(&buf)) {
-	  ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-	  ierr = PetscBagGetData(bag,(void**)&psumm);CHKERRQ(ierr);
-	  ierr = summary_view(output,psumm);CHKERRQ(ierr);
-	  ierr = buffer_pop(&buf);CHKERRQ(ierr);
-	}
-      }
-      old_nentry = nentry;
-      /* wait for new entries */
-      ierr = PetscSleep(polling_interval);CHKERRQ(ierr);
+    if (has_input_filename && has_new_data(&input)) {
+      ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,
+		       &accept_entry, &connect_entry,&connlat_entry,&life_entry,
+		       &retrans_entry,&ignore_entry,&pstats);CHKERRQ(ierr);
     }
-  }/* end main event loop */
+    if (has_accept && has_new_data(&accept_input))  {
+      ierr = read_file(accept_input.file,&linesize,&line,&nentry,TCPACCEPT,mypid,&accept_entry,
+		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
+    }
+    if (has_connect && has_new_data(&connect_input)) {
+      ierr = read_file(connect_input.file,&linesize,&line,&nentry,TCPCONNECT,mypid,&accept_entry,
+		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
+    }
+    if (has_connlat && has_new_data(&connlat_input)) {
+      ierr = read_file(connlat_input.file,&linesize,&line,&nentry,TCPCONNLAT,mypid,&accept_entry,
+		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
+    }
+    if (has_life && has_new_data(&life_input)) {
+      ierr = read_file(life_input.file,&linesize,&line,&nentry,TCPLIFE,mypid,&accept_entry,
+		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
+    }
+    if (has_retrans && has_new_data(&retrans_input)) {
+      ierr = read_file(retrans_input.file,&linesize,&line,&nentry,TCPRETRANS,mypid,&accept_entry,
+		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
+		       &ignore_entry,&pstats);CHKERRQ(ierr);
+    }
+    
+    ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
+    ierr = PetscRealloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
+    ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+    ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
+
+    for (i=0; i<num_pid; ++i) {
+      ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
+      ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
+      ires = buffer_try_insert(&buf,bag);
+      if (ires == -1) {
+	PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
+      }
+    }
+
+    ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
+      
+    if (!rank) {
+      if (output != stdout && output != stderr) {
+	output = fopen(output_filename,"w");
+      }
+      while (!buffer_empty(&buf)) {
+	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
+	ierr = PetscBagGetData(bag,(void**)&psumm);CHKERRQ(ierr);
+	ierr = summary_view(output,psumm);CHKERRQ(ierr);
+	ierr = buffer_pop(&buf);CHKERRQ(ierr);
+      }
+      fclose(output);
+    }
+      
+      /* wait for new entries */
+    ierr = PetscSleep(polling_interval);CHKERRQ(ierr);
+  }
+  /* end main event loop */
   //SAWs_Finalize();
   ierr = PetscFree(pids);CHKERRQ(ierr);
   ierr = PetscFree(pdata);CHKERRQ(ierr);

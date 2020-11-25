@@ -707,7 +707,9 @@ PetscErrorCode register_mpi_types()
 				    offsetof(process_data_summary,rx_kb),
 				    offsetof(process_data_summary,n_event),
 				    offsetof(process_data_summary,avg_latency),
+				    //offsetof(process_data_summary,sd_latency),
 				    offsetof(process_data_summary,avg_lifetime),
+				    //offsetof(process_data_summary,sd_lifetime),
 				    offsetof(process_data_summary,fraction_ipv6),
 				    offsetof(process_data_summary,comm)};
 
@@ -716,7 +718,7 @@ PetscErrorCode register_mpi_types()
 
   int pdata_block_lens[] = {1,1,1,1,1,1,1,COMM_MAX_LEN};
 
-  MPI_Type_create_struct(8,pdata_block_lens,pdata_displacements,pdata_dtypes,
+  MPI_Type_create_struct(10,pdata_block_lens,pdata_displacements,pdata_dtypes,
 			 &MPI_DTYPES[DTYPE_SUMMARY]);
 
   PetscInt i;
@@ -806,7 +808,9 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
   ierr = PetscBagRegisterInt64(pbag,&ps->rx_kb,0,"rx_kb","Received kilobytes");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->n_event,0,"n_event","Number of TCP events (e.g. connect, accept, life, etc.)");CHKERRQ(ierr);
   ierr = PetscBagRegisterReal(pbag,&ps->avg_latency,0.0,"avg_latency","Average connection latency from tcpconnlat");CHKERRQ(ierr);
+  //ierr = PetscBagRegisterReal(pbag,&ps->sd_latency,0.0,"sd_latency","Standard deviation of connection latency from tcpconnlat");CHKERRQ(ierr);
   ierr = PetscBagRegisterReal(pbag,&ps->avg_lifetime,0.0,"avg_lifetime","Average lifetime of a TCP event from tcplife");CHKERRQ(ierr);
+  //ierr = PetscBagRegisterReal(pbag,&ps->sd_lifetime,0.0,"sd_lifetime","Standard deviation of the lifetimes of TCP events from tcplife");CHKERRQ(ierr);
   ierr = PetscBagRegisterReal(pbag,&ps->fraction_ipv6,0.0,"fraction_ipv6","Fraction of the TCP events that used IP v6 instead of v4");CHKERRQ(ierr);
   ierr = PetscBagRegisterString(pbag,&ps->comm,COMM_MAX_LEN,"[unknown]","comm","Process name");CHKERRQ(ierr);
 
