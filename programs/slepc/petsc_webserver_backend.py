@@ -10,11 +10,13 @@ import jsonpickle
 app = Flask(__name__)
 
 entries = {}
+entries_by_name = {}
 
 datafile = '/opt/tcpsummary'
 
 def read_file(filename):
     global entries
+    global entries_by_name
     lines = open(filename,'r').readlines()
     lines_per_entry = 7 #7 data fields and a header
     N = len(lines)
@@ -28,7 +30,7 @@ def read_file(filename):
             mpi_rank, pid = nums
             i += 2 # skip pid line
             spl = lines[i].split('= ')
-            name = spl[1].rstrip('\n')
+            name = spl[1].rstrip('\n').strip(' ')
             i += 1
             spl = lines[i].split('= ')
             tx_kb = int(spl[1])
@@ -55,22 +57,31 @@ def read_file(filename):
             i += 1
             spl = lines[i].split('= ')
             fraction_ipv6 = float(spl[1])
+            val = [name,tx_kb,rx_kb,n_event,
+                   avg_lat,avg_life,fraction_ipv6]
 
             if mpi_rank in entries:
-                entries[mpi_rank][pid] = (name,tx_kb,rx_kb,n_event,
-                                          avg_lat,avg_life,fraction_ipv6)
+                entries[mpi_rank][pid] = tuple(val)
             else:
-                entries[mpi_rank] = {pid : (name,tx_kb,rx_kb,n_event,
-                                            avg_lat,avg_life,fraction_ipv6)}
+                entries[mpi_rank] = {pid : tuple(val)}
+
+            
+            val += [mpi_rank,pid]
+            if name in entries_by_name:
+                entries_by_name[name].append(tuple(val))
+            else:
+                entries_by_name[name] = [tuple(val)]
+            
+            
         i += 1
 
 
 
-def format_entry(entry):
+def format_entry(entry,rank,pid):
         ipentry = f"{(100 * entry[6]):2.2f} " if entry[6] == 0.0 else f"{(100 * entry[6]):2.2f}"
         fstr = f"""
 _________________________________________________________________
-| Summary of network traffic on MPI rank {rk:3d} with PID {pid:8d}: |
+| Summary of network traffic on MPI rank {rank:3d} with PID {pid:8d}: |
 |        process name............... = {entry[0]:15s}          |
 |        transmitted kB............. = {entry[1]:8d}                 |
 |        received kB................ = {entry[2]:8d}                 |
@@ -82,12 +93,17 @@ _________________________________________________________________
         """
         return fstr
 
+def format_by_name(entry):
+    mpi_rank, pid = entry[-2],entry[-1]
+    return format_entry(entry,mpi_rank,pid)
+                    
+
 def format_entries():
     entry_ls = []
     for rk in entries:
         rk_entries = []
         for pid in entries[rk]:
-            rk_entries.append(format_entry(entries[rk][pid]))
+            rk_entries.append(format_entry(entries[rk][pid],rk,pid))
         entry_ls.append('\n'.join(rk_entries))
 
     return '\n'.join(entry_ls)
@@ -99,13 +115,16 @@ def format_entries():
 def root():
     read_file(datafile)
     return format_entries()
-    
+
+
+def good_response(resp):
+    return Response(response=jsonpickle.encode({'response' : resp}),status=200,mimetype='application/json')
 
 @app.route('/api/get/all',methods=['GET'])
 def get_all():
     read_file(datafile)
     resp = format_entries()
-    return Response(response=jsonpickle.encode({'response' : resp}),status=200,mimetype='application/json')
+    return good_response(resp)
 
 
 def key_not_found_response(key,dname):
@@ -116,19 +135,31 @@ def key_not_found_response(key,dname):
 def get(rank,pid):
     read_file(datafile)
     try:
-        entry = entries[rk]
+        entry = entries[rank]
     except KeyError:
-        return key_not_found_response(rk,'entries')
+        return key_not_found_response(rank,'entries')
 
     try:
         entry = entry[pid]
     except KeyError:
-        return key_not_found_response(pid,f"entries[{rk}]")
+        return key_not_found_response(pid,f"entries[{rank}]")
 
     resp = format_entry(entry)
-    return Response(response=jsonpickle.encode({'response' : resp}),status=200,mimetype='application/json')
-                    
-        
+    return good_response(resp)
+
+
+
+
+@app.route('/api/get/<string:name>',methods=['GET'])
+def get_name(name):
+    read_file(datafile)
+    try:
+        entry = entries_by_name[name]
+    except KeyError:
+        return key_not_found_response(name,'entries_by_name')
+    resp = [format_by_name(e) for e in entry]
+    return good_response(resp)
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
