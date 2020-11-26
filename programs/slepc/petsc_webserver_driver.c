@@ -143,12 +143,12 @@ void sigabort_handler(int sig)
 PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file)
 {
   PetscFunctionBeginUser;
-  char path[2*PETSC_MAX_PATH_LEN + 10];
+  char path[PETSC_MAX_PATH_LEN];
   sprintf(path,"python3 %s -f %s",server_path,server_input_file);
   int spawn_error;
-  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s\n",launcher_path);
+  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s, gonna broadcast %D chars\n",launcher_path,PETSC_MAX_PATH_LEN);
   MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,MPI_INFO_NULL,0,PETSC_COMM_SELF,inter,&spawn_error);
-  MPI_Bcast(path,2*PETSC_MAX_PATH_LEN+10,MPI_CHAR,0,*inter);
+  MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   PetscFunctionReturn(spawn_error);
 }
 
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
   }
   ierr = PetscOptionsGetString(NULL,NULL,"--python_launcher",python_launcher_name,PETSC_MAX_PATH_LEN,&has_filename);
   if (!has_filename) {
-    strcpy(python_launcher_name,"webserver_launcher");
+    strcpy(python_launcher_name,"./webserver_launcher");
   }
   ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_input_filename);CHKERRQ(ierr);
   ierr = PetscOptionsGetString(NULL,NULL,"--accept_file",accept_filename,PETSC_MAX_PATH_LEN,&has_accept);CHKERRQ(ierr);
@@ -315,13 +315,13 @@ int main(int argc, char **argv)
     }
   }
 					    
+  MPI_Barrier(PETSC_COMM_WORLD);
   
-  /*
   if (!rank) {
     // launch server 
-    printf("about to fork\n");
+    //printf("about to fork\n");
     ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename);CHKERRQ(ierr);
-  }*/
+  }
   MPI_Barrier(PETSC_COMM_WORLD);
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {

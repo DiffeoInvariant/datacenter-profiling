@@ -895,8 +895,6 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
       if (ires == -1) {
 	PetscPrintf(PETSC_COMM_WORLD,"Error: buffer is full! Try increasing the capacity. Discarding this entry\n.");
       }
-      //ierr = PetscBagView(bag,PETSC_VIEWER_SAWS_WORLD);CHKERRQ(ierr);
-      //ierr = PetscBagView(bag,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
       
     }
   } 
