@@ -1,6 +1,6 @@
 
 
-.PHONY: svd parsetest webserver
+.PHONY: svd parsetest webserver webserver_launcher
 
 #default: all
 
@@ -16,7 +16,9 @@ CFLAGS += $(shell pkg-config --cflags-only-I $(PACKAGES))
 LDFLAGS := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
 LDFLAGS += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
 LDLIBS := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
-
+PYLIB=/usr/lib/python3.8/config-3.8-x86_64-linux-gnu
+PYINCL=-I/usr/include -I/usr/include/python3.8
+PYLINK=-lpython3.8 -L$(PYLIB)
 
 include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
 include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscrules
@@ -33,4 +35,8 @@ parsetest: test_parse.c petsc_webserver.c
 
 
 webserver: petsc_webserver.c petsc_webserver_driver.c
-	$(LINK.c) -o $@ $^ $(LDLIBS) -lSAWs
+	$(LINK.c) -o $@ $^ $(LDLIBS) -rdynamic
+
+
+webserver_launcher: webserver_launcher.c
+	$(LINK.c) -o $@ $^ $(PYINCL) $(LDLIBS) $(PYLINK)

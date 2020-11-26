@@ -14,13 +14,18 @@ From: ubuntu:latest
 %environment
     export TZ=America/Los_Angeles
     export OMPI_DIR=/opt/ompi
+    export OMPI_VERSION=4.0.0
     export SINGULARITY_OMPI_DIR=$OMPI_DIR
     export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
     export SINGULARITYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
     export INPUT_FILE=/opt/bcsstk32.bin
     export OUTPUT_SVALS=/opt/svals.bin
     export OUTPUT_SVECS=/opt/svecs.bin
-
+    export TCP_INFO_FILE=/opt/tcpinfo.txt
+    export FLASK_PORT=5000
+    export PETSC_DIR=/usr/local/petsc
+    export PETSC_ARCH=arch-linux-c-opt
+    
 
 %setup
     mkdir -p /tcpaccept_data
@@ -31,15 +36,13 @@ From: ubuntu:latest
 %post
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
-    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind
+    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python3.8 python3.8-dev zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind
     pip3 install --upgrade flask jsonpickle
     echo "Installing BCC..."
     git clone https://github.com/iovisor/bcc.git
     mkdir -p bcc/build && cd bcc/build && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
 
     echo "Installing OpenMPI 4.0.0..."
-    export OMPI_DIR=/opt/ompi
-    export OMPI_VERSION=4.0.0
     export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-$OMPI_VERSION.tar.bz2"
     mkdir -p /opt
     mkdir -p /tmp/ompi
@@ -59,7 +62,7 @@ From: ubuntu:latest
     echo "Installing ngrok..."
     wget -O /opt/ngrok.zip https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
     #USER: replace this token with your token
-    cd /opt && unzip ngrok.zip && ./ngrok authtoken 1kkupNs1lTw5vB030197fnp1fBw_6Ke4YYuJ91UW1EEV44Vbq
+    cd /opt && unzip ngrok.zip && ./ngrok authtoken 1kkupNs1lTw5vB030197fnp1fBw_6Ke4YYuJ91UW1EEV44Vbq &
     
     echo "Compiling svd program..."
     cd /opt && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt svd
@@ -75,6 +78,6 @@ From: ubuntu:latest
     tcpconnlat > tcpconnect_data/tcpconnlat.log &
     tcplife > tcplife_data/tcplife.log &
     tcpretrans > tcpretrans_data/tcpretrans.log &
-    /opt/ngrok http 5000 &
+    /opt/ngrok http $FLASK_PORT &
     
     

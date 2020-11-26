@@ -192,7 +192,7 @@ PetscErrorCode parse_ipv4(const char *str, char *ip)
   PetscFunctionBeginUser;
   const char *format = "%15[0-9.]";
   if (sscanf(str,format,ip) != 1) {
-    SETERRQ1(PETSC_COMM_WORLD,1,"Error parsing string %s for ipv4 address.",str);
+    PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error parsing string %s for ipv4 address.\n",str);
   }
   PetscFunctionReturn(0);
 }
@@ -202,7 +202,7 @@ PetscErrorCode parse_ipv6(const char *str, char *ip)
   PetscFunctionBeginUser;
   const char *format = "%39[0-9:a-z]";
   if (sscanf(str,format,ip) != 1) {
-    SETERRQ1(PETSC_COMM_WORLD,1,"Error parsing string %s for ipv6 address.",str);
+    PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error parsing string %s for ipv6 address.\n",str);
   }
   PetscFunctionReturn(0);
 }
@@ -211,7 +211,7 @@ PetscErrorCode parse_ipv6(const char *str, char *ip)
 
 #define CHECK_TOKEN(str,tok,i) do {		\
   if (!tok) { \
-  PetscPrintf(PETSC_COMM_WORLD,"Failed to find expected token number %D in string %s\n",i,str); \
+    PetscFPrintf(PETSC_COMM_WORLD,stderr,"Failed to find expected token number %D in string %s\n",i,str); \
   return i; \
   }\
   } while(0)
@@ -716,9 +716,9 @@ PetscErrorCode register_mpi_types()
   MPI_Datatype pdata_dtypes[] = {MPI_INT,MPI_INT,MPI_LONG,MPI_LONG,MPI_LONG,
 				 MPI_DOUBLE,MPI_DOUBLE,MPI_DOUBLE,MPI_CHAR};
 
-  int pdata_block_lens[] = {1,1,1,1,1,1,1,COMM_MAX_LEN};
+  int pdata_block_lens[] = {1,1,1,1,1,1,1,1,COMM_MAX_LEN};
 
-  MPI_Type_create_struct(10,pdata_block_lens,pdata_displacements,pdata_dtypes,
+  MPI_Type_create_struct(9,pdata_block_lens,pdata_displacements,pdata_dtypes,
 			 &MPI_DTYPES[DTYPE_SUMMARY]);
 
   PetscInt i;
@@ -824,12 +824,13 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
 PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
 {
   PetscErrorCode ierr;
-  PetscInt       rank,size,nitem,nextant,summs,i,ires;
-  process_data_summary *summaries=NULL,*summary,*ssummaries;
+  PetscInt       rank,size,nitem,nextant,i,ires;
+  process_data_summary *summaries=NULL,*summary,*ssummaries=NULL;
   PetscBag             bag;
   PetscFunctionBeginUser;
   MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
   MPI_Comm_size(PETSC_COMM_WORLD,&size);
+  PetscInt summs;
   if (size == 1) {
     /* only one process in the communicator; already on root */
     PetscFunctionReturn(0);
@@ -867,14 +868,14 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
     if (nextant + summs >= buf->capacity) {
       SETERRQ3(PETSC_COMM_WORLD,1,"Buffer on root has capacity %D, but currently holds %D entries and is being asked to accept %D more! Increase the buffer size on root.",buf->capacity,nextant,nitem);
     }
-    ierr = PetscCalloc1(summs,&summaries);CHKERRQ(ierr);
+    ierr = PetscCalloc1(summs+nextant,&summaries);CHKERRQ(ierr);
   }
 
   MPI_Barrier(PETSC_COMM_WORLD);
   MPI_Gather(ssummaries,nitem,MPI_DTYPES[DTYPE_SUMMARY],
 	     summaries,summs,MPI_DTYPES[DTYPE_SUMMARY],
 	     0,PETSC_COMM_WORLD);
-  
+  //MPI_Barrier(PETSC_COMM_WORLD);
   /* push the new summaries into the buffer */
   if (!rank) {
     for (i=0; i<summs; ++i) {

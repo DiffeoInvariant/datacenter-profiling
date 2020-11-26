@@ -1,9 +1,10 @@
 #define  _POSIX_C_SOURCE 200809L
 #include "petsc_webserver.h"
 #include <stdio.h>
-#include <petscviewersaws.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <signal.h>
+#include <execinfo.h>
 
 static const char help[] = "PETSc webserver: \n";
 /*
@@ -128,7 +129,28 @@ void sigint_handler(int sig_num)
   PetscFinalize();
   exit(sig_num);
 }
-  
+
+void sigabort_handler(int sig)
+{
+  void *arr[20];
+  size_t sz;
+
+  sz = backtrace(arr,20);
+  backtrace_symbols_fd(arr,sz,STDERR_FILENO);
+  exit(sig);
+}
+
+PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file)
+{
+  PetscFunctionBeginUser;
+  char path[2*PETSC_MAX_PATH_LEN + 10];
+  sprintf(path,"python3 %s -f %s",server_path,server_input_file);
+  int spawn_error;
+  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s\n",launcher_path);
+  MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,MPI_INFO_NULL,0,PETSC_COMM_SELF,inter,&spawn_error);
+  MPI_Bcast(path,2*PETSC_MAX_PATH_LEN+10,MPI_CHAR,0,*inter);
+  PetscFunctionReturn(spawn_error);
+}
 
 int main(int argc, char **argv)
 {
@@ -140,7 +162,9 @@ int main(int argc, char **argv)
   char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
   char           accept_filename[PETSC_MAX_PATH_LEN], connect_filename[PETSC_MAX_PATH_LEN],
                  connlat_filename[PETSC_MAX_PATH_LEN], output_filename[PETSC_MAX_PATH_LEN],
-                 life_filename[PETSC_MAX_PATH_LEN], retrans_filename[PETSC_MAX_PATH_LEN];
+                 life_filename[PETSC_MAX_PATH_LEN], retrans_filename[PETSC_MAX_PATH_LEN],
+    python_server_name[PETSC_MAX_PATH_LEN], python_launcher_name[PETSC_MAX_PATH_LEN];
+  MPI_Comm       server_comm;
   FILE           *output;
   PetscBool      has_filename,has_filename2,ignore_entry,has_accept,has_connect,has_connlat,has_life,has_retrans,has_input_filename;
   InputType      input_type;
@@ -152,6 +176,7 @@ int main(int argc, char **argv)
   PetscViewer     viewer;
   process_data       *pdata;
   process_data_summary *psumm;
+  //signal(SIGABRT,sigabort_handler);
   ierr = PetscInitialize(&argc,&argv,NULL,help);if (ierr) return ierr;
   ierr = register_mpi_types();CHKERRQ(ierr);
   mypid = getpid();
@@ -161,11 +186,15 @@ int main(int argc, char **argv)
   linesize = 0;
 
   has_filename = has_filename2 = ignore_entry = has_accept = has_connect = has_connlat = has_life = has_retrans = has_input_filename = PETSC_FALSE;
-  
-  //SAWs_Initialize();
-  //SAWs_Set_Use_Logfile("SAWs.log");
-  //SAWs_Get_FullURL(sizeof(sawsurl),sawsurl);
-  //PetscPrintf(PETSC_COMM_WORLD,"SAWs is uploading to %s from process number %D\n",sawsurl,mypid);
+
+  ierr = PetscOptionsGetString(NULL,NULL,"--python_server",python_server_name,PETSC_MAX_PATH_LEN,&has_filename);
+  if (!has_filename) {
+    strcpy(python_server_name,"petsc_webserver_backend.py");
+  }
+  ierr = PetscOptionsGetString(NULL,NULL,"--python_launcher",python_launcher_name,PETSC_MAX_PATH_LEN,&has_filename);
+  if (!has_filename) {
+    strcpy(python_launcher_name,"webserver_launcher");
+  }
   ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_input_filename);CHKERRQ(ierr);
   ierr = PetscOptionsGetString(NULL,NULL,"--accept_file",accept_filename,PETSC_MAX_PATH_LEN,&has_accept);CHKERRQ(ierr);
   ierr = PetscOptionsGetString(NULL,NULL,"--connect_file",connect_filename,PETSC_MAX_PATH_LEN,&has_connect);CHKERRQ(ierr);
@@ -212,27 +241,7 @@ int main(int argc, char **argv)
   /* read each file */
   if (has_input_filename) {
     input.file = fopen(filename,"r");
-    /*
-    getline(&line,&linesize,input.file);
-    getline(&line,&linesize,input.file);
-    nentry = 0;
-    
-    //PetscPrintf(PETSC_COMM_WORLD,"Creating SAWs viewer.\n");
-    //ierr = PetscViewerSAWsOpen(PETSC_COMM_WORLD,&viewer);CHKERRQ(ierr);
-    while((nread = getline(&line,&linesize,input.file)) != -1) {
-      ierr = handle_line(line,nentry,input_type,mypid,&accept_entry,
-			 &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
-			 &ignore_entry,&pstats);CHKERRQ(ierr);
-      if (ignore_entry) {
-	PetscFPrintf(PETSC_COMM_WORLD,stderr,"Ignoring entry\n");
-	ignore_entry = PETSC_FALSE;
-	continue;
-      } else {
-	++nentry;
-      }
-    }
-    PetscFPrintf(PETSC_COMM_WORLD,stderr,"Handled %D entries.\n",nentry);
-    */
+
     ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
 		     &ignore_entry,&pstats);CHKERRQ(ierr);
@@ -290,17 +299,7 @@ int main(int argc, char **argv)
     } 
   }
 
-  /*if (!rank) {
-    while (!buffer_empty(&buf)) {
-      ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
-      ierr = PetscBagGetData(bag,(void**)&psumm);CHKERRQ(ierr);
-      ierr = summary_view(stdout,psumm);CHKERRQ(ierr);
-      ierr = buffer_pop(&buf);CHKERRQ(ierr);
-    }
-  }*/
-  
   ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
-  
   
   if (!rank) {
     while (!buffer_empty(&buf)) {
@@ -316,8 +315,14 @@ int main(int argc, char **argv)
     }
   }
 					    
+  
+  /*
+  if (!rank) {
+    // launch server 
+    printf("about to fork\n");
+    ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename);CHKERRQ(ierr);
+  }*/
   MPI_Barrier(PETSC_COMM_WORLD);
-
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
     if (has_input_filename && has_new_data(&input)) {

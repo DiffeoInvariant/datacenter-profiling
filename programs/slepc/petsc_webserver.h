@@ -113,7 +113,7 @@ typedef struct {
 typedef struct {
   PetscInt  pid,rank;
   long      tx_kb,rx_kb,n_event;
-  PetscReal avg_latency,sd_latency,avg_lifetime,sd_lifetime,fraction_ipv6;
+  PetscReal avg_latency,avg_lifetime,fraction_ipv6;
   char      comm[COMM_MAX_LEN];
 } process_data_summary;
 
