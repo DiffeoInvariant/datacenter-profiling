@@ -6,6 +6,8 @@ import math
 import time
 import argparse
 import jsonpickle
+from typing import NamedTuple
+import operator
 
 app = Flask(__name__)
 
@@ -57,25 +59,57 @@ def read_file(filename):
             i += 1
             spl = lines[i].split('= ')
             fraction_ipv6 = float(spl[1])
-            val = [name,tx_kb,rx_kb,n_event,
-                   avg_lat,avg_life,fraction_ipv6]
+            #val = [name,tx_kb,rx_kb,n_event,
+            #       avg_lat,avg_life,fraction_ipv6]
+            entr = Entry(mpi_rank,pid,name,tx_kb,rx_kb,n_event,
+                         avg_lat,avg_life,fraction_ipv6 * 100)
 
             if mpi_rank in entries:
-                entries[mpi_rank][pid] = tuple(val)
+                entries[mpi_rank][pid] = entr
             else:
-                entries[mpi_rank] = {pid : tuple(val)}
+                entries[mpi_rank] = {pid : entr}
 
-            
-            val += [mpi_rank,pid]
             if name in entries_by_name:
-                entries_by_name[name].append(tuple(val))
+                entries_by_name[name].append(entr)
             else:
-                entries_by_name[name] = [tuple(val)]
+                entries_by_name[name] = [entr]
             
             
         i += 1
 
 
+
+class Entry(NamedTuple):
+    rank: int = 0
+    pid: int = 0
+    name: str = "[unknown]"
+    tx_kb: int = 0
+    rx_kb: int = 0
+    nevent: int = 0
+    avg_lat: float = 0.0
+    avg_life: float = 0.0
+    pct_ipv6: float = 0.0
+
+    def __repr__(self):
+        return self.formatted()
+
+    def __str__(self):
+        return self.formatted()
+
+    def formatted(self):
+        fstr = f"""
+_________________________________________________________________
+| Summary of network traffic on MPI rank {self.rank:3d} with PID {self.pid:8d}: |
+|        process name............... = {self.name:15s}          |
+|        transmitted kB............. = {self.tx_kb:8d}                 |
+|        received kB................ = {self.rx_kb:8d}                 |
+|        num TCP events............. = {self.nevent:8d}                 |
+|        Average connection latency  = {self.avg_lat:8.2f}                 |
+|        Average connection lifetime = {self.avg_life:8.2f}                 |
+|        Percent IPv6............... = {self.pct_ipv6:2.2f}                    |
+|_______________________________________________________________|
+        """
+        return fstr
 
 def format_entry(entry,rank,pid):
         ipentry = f"{(100 * entry[6]):2.2f} " if entry[6] == 0.0 else f"{(100 * entry[6]):2.2f}"
@@ -103,10 +137,31 @@ def format_entries():
     for rk in entries:
         rk_entries = []
         for pid in entries[rk]:
-            rk_entries.append(format_entry(entries[rk][pid],rk,pid))
+            rk_entries.append(entries[rk][pid].formatted())
         entry_ls.append('\n'.join(rk_entries))
 
     return '\n'.join(entry_ls)
+
+
+def get_max(attr):
+    return max(entries.values(),key=operator.attrgetter(attr))
+
+def get_max_from(dct, attr):
+    return max(dct.values(),key=operator.attrgetter(attr))
+
+def get_max_transmitter():
+    return get_max('tx_kb')
+
+def get_max_receiver():
+    return get_max('rb_kx')
+
+def get_max_event():
+    return get_max('nevent')
+
+def get_max_lifetime():
+    return get_max('avg_life')
+               
+    
 
 
 
@@ -157,9 +212,9 @@ def get_name(name):
         entry = entries_by_name[name]
     except KeyError:
         return key_not_found_response(name,'entries_by_name')
-    resp = [format_by_name(e) for e in entry]
+    resp = [e.formatted() for e in entry]
     return good_response(resp)
-    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

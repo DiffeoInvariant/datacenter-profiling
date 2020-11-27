@@ -477,10 +477,44 @@ PetscErrorCode tcpretrans_entry_parse_line(tcpretrans_entry *entry, char *str)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *e, char *b)
+PetscErrorCode tcpconnlat_entry_parse_line(tcpconnlat_entry *entry, char *str)
 {
-  SETERRQ(PETSC_COMM_WORLD,1,"Error, tcpconnlat_entry_parse_line() not implemented yet");
-  return 0;
+  PetscErrorCode ierr;
+  char *substr;
+  const char sep[2] = " ";
+  size_t len;
+  PetscFunctionBeginUser;
+  substr = strtok(str,sep);
+  CHECK_TOKEN(str,substr,0);
+  entry->pid = atoi(substr);
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,1);
+  ierr = PetscStrlen(substr,&len);CHKERRQ(ierr);
+  ierr = PetscStrncpy(entry->comm,substr,len+1);CHKERRQ(ierr);
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,2);
+  entry->ip = atoi(substr);
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,3);
+  if (entry->ip == 4) {
+    ierr = parse_ipv4(substr,entry->saddr);CHKERRQ(ierr);
+  } else {
+    ierr = parse_ipv6(substr,entry->saddr);CHKERRQ(ierr);
+  }
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,4);
+  if (entry->ip == 4) {
+    ierr = parse_ipv4(substr,entry->daddr);CHKERRQ(ierr);
+  } else {
+    ierr = parse_ipv6(substr,entry->daddr);CHKERRQ(ierr);
+  }
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,6);
+  entry->dport = atoi(substr);
+  substr = strtok(NULL,sep);
+  CHECK_TOKEN(str,substr,7);
+  entry->lat_ms = atof(substr);
+  PetscFunctionReturn(0);
 }
 
 
@@ -820,8 +854,16 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
 }
 
 
-
 PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
+{
+  PetscErrorCode ierr;
+  PetscFunctionBeginUser;
+  ierr = buffer_gather(buf,DTYPE_SUMMARY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+
+PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
 {
   PetscErrorCode ierr;
   PetscInt       rank,size,nitem,nextant,i,ires;
@@ -871,11 +913,10 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
     ierr = PetscCalloc1(summs+nextant,&summaries);CHKERRQ(ierr);
   }
 
-  MPI_Barrier(PETSC_COMM_WORLD);
-  MPI_Gather(ssummaries,nitem,MPI_DTYPES[DTYPE_SUMMARY],
-	     summaries,summs,MPI_DTYPES[DTYPE_SUMMARY],
+  MPI_Gather(ssummaries,nitem,MPI_DTYPES[dtype],
+	     summaries,summs,MPI_DTYPES[dtype],
 	     0,PETSC_COMM_WORLD);
-  //MPI_Barrier(PETSC_COMM_WORLD);
+
   /* push the new summaries into the buffer */
   if (!rank) {
     for (i=0; i<summs; ++i) {
@@ -898,8 +939,6 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
       
     }
   } 
-
-  MPI_Barrier(PETSC_COMM_WORLD);
   if (rank) {
     ierr = PetscFree(ssummaries);CHKERRQ(ierr);
   } else {
