@@ -173,16 +173,23 @@ extern PetscBool      buffer_full(entry_buffer *);
 
 extern PetscBool      buffer_empty(entry_buffer *);
 
-/* get an item from the buffer. If you call buffer_get_item() multiple
-   times in a row WITHOUT calling buffer_pop() in between each call,
-   you will get the same PetscBag on each call to buffer_get_item()*/
+/* gets the object that has spent the most time in the buffer.
+   If you call buffer_get_item() multiple times in a row WITHOUT
+   calling buffer_pop() in between each call, you will get the same
+   PetscBag on each call to buffer_get_item()*/
 extern PetscErrorCode buffer_get_item(entry_buffer *, PetscBag *);
 
+/* remove the object that has spent the most time in the buffer,
+   and free its memory */
 extern PetscErrorCode buffer_pop(entry_buffer *);
 
 /* gathers all buffer summaries to a buffer on root */
 extern PetscErrorCode buffer_gather_summaries(entry_buffer *);
 
+/* gather everything in the buffer pointed to by the first parameter to root,
+   with all the entries of the type indicated by the second parameter.
+   NOTE: if all the entries are not of that type, that will invoke 
+   undefined behavior in the MPI_Gather(), and probably cause a crash */
 extern PetscErrorCode buffer_gather(entry_buffer *, SERVER_MPI_DTYPE);
 
 
@@ -200,9 +207,13 @@ typedef struct {
   char      comm[COMM_MAX_LEN];
 } process_data_summary;
 
+/* write the summary pointed to by the second parameter to the
+   file pointed to by the first */
 extern PetscErrorCode summary_view(FILE *, process_data_summary *);
 
-/* first parameter is pid */
+/* create a process_data_summary and store it in the third parameter. The
+   first parameter is the PID, and the second is a pointer to the 
+   process_data you want to summarize.*/
 extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_data_summary *);
 
 #define pid_hash(pid) pid
@@ -221,9 +232,11 @@ extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_d
 
 #define int_equal(lhs,rhs) lhs == rhs
 
-static process_data default_pdata = {0,0,0,0,0,0,0,0,0,0.0,0.0};
+static process_data default_pdata = {0,0,0,0,0,0,0,0,0,0.0,0.0,"[unknown]"};
 
 PETSC_HASH_MAP(HMapData,PetscInt,process_data,PetscHashInt,int_equal,default_pdata);
+
+/* sets the values of the process_data to the defaults */
 extern PetscErrorCode process_data_initialize(process_data *);
 
 extern PetscReal fraction_ipv6(process_data *);

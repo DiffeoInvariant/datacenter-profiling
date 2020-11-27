@@ -40,42 +40,47 @@ PetscErrorCode handle_line(char *line, PetscInt nentry, InputType input_type, Pe
     case TCPACCEPT:
       //ierr = create_tcpaccept_entry_bag(accept_entry,bagptr,nentry);CHKERRQ(ierr);
       ierr = tcpaccept_entry_parse_line(accept_entry,line); if (ierr) break;
-      if ((accept_entry)->pid == mypid) {
-	/* if the traffic came from this program, don't upload it to SAWs */
+      if ((accept_entry)->pid == mypid || ierr) {
+	/* if the traffic came from this program, don't upload it to the server */
 	*ignore_entry = PETSC_TRUE;
+	//break;
       }
       ierr = process_statistics_add_accept(pstats,accept_entry);CHKERRQ(ierr);
       break;
     case TCPCONNECT:
       ierr = tcpconnect_entry_parse_line(connect_entry,line);if (ierr) break;
       //PetscPrintf(PETSC_COMM_WORLD,"parsed bag %D\n",nentry);
-      if ((connect_entry)->pid == mypid) {
-	/* if the traffic came from this program, don't upload it to SAWs */
+      if ((connect_entry)->pid == mypid || ierr) {
+	/* if the traffic came from this program, don't upload it to the server */
 	*ignore_entry = PETSC_TRUE;
+	break;
       }
       ierr = process_statistics_add_connect(pstats,connect_entry);CHKERRQ(ierr);
       break;
     case TCPCONNLAT:
       ierr = tcpconnlat_entry_parse_line(connlat_entry,line);if (ierr) break;
-      if ((connlat_entry)->pid == mypid) {
-	/* if the traffic came from this program, don't upload it to SAWs */
+      if ((connlat_entry)->pid == mypid || ierr) {
+	/* if the traffic came from this program, don't upload it to the server*/
 	*ignore_entry = PETSC_TRUE;
+	break;
       }
       ierr = process_statistics_add_connlat(pstats,connlat_entry);CHKERRQ(ierr);
       break;
     case TCPLIFE:
       ierr = tcplife_entry_parse_line(life_entry,line);if (ierr) break;
-      if ((life_entry)->pid == mypid) {
-	/* if the traffic came from this program, don't upload it to SAWs */
+      if ((life_entry)->pid == mypid || ierr) {
+	/* if the traffic came from this program, don't upload it to the server */
 	*ignore_entry = PETSC_TRUE;
+	break;
       }
       ierr = process_statistics_add_life(pstats,life_entry);CHKERRQ(ierr);
       break;
     case TCPRETRANS:
       ierr = tcpretrans_entry_parse_line(retrans_entry,line);if (ierr) break;
-      if ((retrans_entry)->pid == mypid) {
-	/* if the traffic came from this program, don't upload it to SAWs */
+      if ((retrans_entry)->pid == mypid || ierr) {
+	/* if the traffic came from this program, don't upload it to the server */
 	*ignore_entry = PETSC_TRUE;
+	break;
       }
       ierr = process_statistics_add_retrans(pstats,retrans_entry);CHKERRQ(ierr);
       break;
@@ -95,8 +100,8 @@ PetscErrorCode read_file(FILE *fd, size_t *linesize, char **line, PetscInt *nent
   PetscErrorCode ierr;
   PetscFunctionBeginUser;
   /* skip header lines */
-  getline(line,linesize,fd);
-  getline(line,linesize,fd);
+  //getline(line,linesize,fd);
+  //getline(line,linesize,fd);
   *nentry = 0;
 
   while ((nread = getline(line,linesize,fd)) != -1) {

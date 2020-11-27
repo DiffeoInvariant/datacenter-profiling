@@ -947,10 +947,6 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
   PetscFunctionReturn(0);
 }
 
-  
-	     
-	      
-    
    
 PetscErrorCode summary_view(FILE *fd, process_data_summary *psum)
 {
