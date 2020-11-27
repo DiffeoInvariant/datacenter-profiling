@@ -29,13 +29,14 @@ From: ubuntu:latest
     
 
 %setup
+    
+
+%post
     mkdir -p /tcpaccept_data
     mkdir -p /tcpconnect_data
     mkdir -p /tcplife_data
     mkdir -p /tcpconnlat_data
     mkdir -p /tcpretrans_data
-
-%post
     mkdir -p /bin
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
