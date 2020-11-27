@@ -332,7 +332,6 @@ int main(int argc, char **argv)
   
   if (!rank) {
     // launch server 
-    //printf("about to fork\n");
     ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
   }
   MPI_Barrier(PETSC_COMM_WORLD);
@@ -402,7 +401,6 @@ int main(int argc, char **argv)
     ierr = PetscSleep(polling_interval);CHKERRQ(ierr);
   }
   /* end main event loop */
-  //SAWs_Finalize();
   ierr = PetscFree(pids);CHKERRQ(ierr);
   ierr = PetscFree(pdata);CHKERRQ(ierr);
   PetscFinalize();

@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <petscsys.h>
 #include <limits.h>
-#include <petscviewersaws.h>
 
 
 PetscErrorCode create_tcpaccept_entry_bag(tcpaccept_entry **entryptr, PetscBag *bagptr, PetscInt n)
