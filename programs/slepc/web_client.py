@@ -49,7 +49,11 @@ def get_name(name):
 
     
 if __name__ == '__main__':
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-H','--host',default='localhost',help='Web host')
+    parser.add_argument('-p','--port',default=5000,type=int,help='Which TCP port is the server using?')
+    args = parser.parse_args()
+    make_addr(args.host,args.port)
     response = get_all()
     print(f"get_all() gave\n{response}")
     response = get_name('ssh')

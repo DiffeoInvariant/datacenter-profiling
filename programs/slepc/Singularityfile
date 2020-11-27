@@ -31,31 +31,34 @@ From: ubuntu:latest
     mkdir -p /tcpaccept_data
     mkdir -p /tcpconnect_data
     mkdir -p /tcplife_data
+    mkdir -p /tcpconnlat_data
     mkdir -p /tcpretrans_data
 
 %post
+    mkdir -p /bin
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
-    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python3.8 python3.8-dev zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind
+    apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python3.8 python3.8-dev zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind unzip
     pip3 install --upgrade flask jsonpickle
     echo "Installing BCC..."
     git clone https://github.com/iovisor/bcc.git
     mkdir -p bcc/build && cd bcc/build && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
 
     echo "Installing OpenMPI 4.0.0..."
-    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-$OMPI_VERSION.tar.bz2"
+    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.0.tar.bz2"
     mkdir -p /opt
     mkdir -p /tmp/ompi
     
-    cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
-    cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
-    export PATH=$OMPI_DIR/bin:$PATH
+    cd /tmp/ompi && wget -O openmpi-4.0.0.tar.bz2 $OMPI_URL && tar -xjf openmpi-4.0.0.tar.bz2
+    cd /tmp/ompi/openmpi-4.0.0 && ./configure --prefix=/opt/ompi && make install
+    export PATH=/opt/ompi/bin:$PATH
     export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
     export MANPATH=$OMPI_DIR/share/man:$MANPATH
     
     echo "Installing PETSc and SLEPc..."
-    cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc
-    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 --download-saws COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=$OMPI_DIR && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt
+    cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc && pwd && ls
+    cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=no --download-scalapack --download-slepc --download-f2cblaslapack=1 COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --with-mpi-dir=/opt/ompi
+    make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /usr/local/petsc
     export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
 
 
@@ -65,17 +68,19 @@ From: ubuntu:latest
     cd /opt && unzip ngrok.zip && ./ngrok authtoken 1kkupNs1lTw5vB030197fnp1fBw_6Ke4YYuJ91UW1EEV44Vbq &
     
     echo "Compiling svd program..."
-    cd /opt && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt svd
+    make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt svd
 
     echo "Compiling PETSc webserver..."
-    cd /opt && make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt webserver
+    make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt webserver
+    make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt webserver_launcher
+    
 
 
 
 %startscript
     tcpaccept > tcpaccept_data/tcpaccept.log &
     tcpconnect > tcpconnect_data/tcpconnect.log &
-    tcpconnlat > tcpconnect_data/tcpconnlat.log &
+    tcpconnlat > tcpconnlat_data/tcpconnlat.log &
     tcplife > tcplife_data/tcplife.log &
     tcpretrans > tcpretrans_data/tcpretrans.log &
     /opt/ngrok http $FLASK_PORT &

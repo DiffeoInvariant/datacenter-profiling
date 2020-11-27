@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <petscsys.h>
 #include <limits.h>
-#include <SAWs.h>
 #include <petscviewersaws.h>
 
 

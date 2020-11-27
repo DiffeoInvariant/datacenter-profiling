@@ -2,23 +2,38 @@
 #include "petsc_webserver.h"
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <signal.h>
-#include <execinfo.h>
 
-static const char help[] = "PETSc webserver: \n";
-/*
+static const char help[] = "PETSc webserver: This program periodically reads the output of the eBPF programs\n"
+  "tcpaccept, tcpconnect, tcpconnlat, tcplife, and tcpretrans, summarizes that data, and stores that data in a\n"
+  "message queue. The summaries are then gathered to the root node (MPI rank 0), where it is written to an output\n"
+  "file. Once the existing input files have been read to their ends, the root process spawns a new subcommunicator\n"
+  "via MPI_Comm_spawn() and launches a Python webserver (currently written with Flask) on that spawned process\n"
+  "that reads the output file, and serves requests to a REST API. Available endpoints are:\n"
+  "-------------------------------------------------------------------------------------------\n"
+  "GET /api/get/all (gets data for all processes on all MPI ranks)\n"
+  "GET /api/get/{rank}/{pid} (gets data for the process with PID {pid} on MPI rank {rank})\n"
+  "GET /api/get/{name} (gets data on all MPI ranks for all processes with name {name}\n"
+  "-------------------------------------------------------------------------------------------\n"
   "Usage:\n"
   "Options:\n"
-  "-file [filename] : input file\n"
-  "-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : what sort of input file\n"
+  "--python_server [filename] : (optional, default petsc_webserver_backend.py) filename of Python web server\n"
+  "       you want to launch\n"
+  "-file [filename] : (optional if any of --XXX_file are given) input file\n"
+  "-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : (required only if -file is given) what sort of\n"
+  "       input file is the -file argument?\n"
+  "--accept_file [filename] : (optional) file for tcpaccept data\n"
+  "--connect_file [filename] : file for tcpconnect data\n"
+  "--connlat_file [filename] : file for tcpconnlat data\n"
+  "--life_file [filename] : file for tcplife data\n"
+  "--retrans_file [filename] : file for tcpretrans data\n"
+  "-o (--output) [filename] : (optional, default stdout) file to output data to\n"
+  "-p (--port) [port (int)] : (optional, default 5000) which TCP port to use to serve requests\n"
   "--buffer_capcity [capacity] : (optional, default 10,000) size of the buffer (number of entries)\n"
-  "--polling_interval [interval] : (optional, default 2.5) how many seconds to "
-  "       wait before checking the file for more data after reaching the end?\n"
-  "--url_filename [url_filename] : (optional) filename to write the URL of the "
-  "       SAWs server to. Possibly useful if you want to have another program wait for "
-  "       that entry to be written then email/otherwise send it to the user from a remote system.\n";
-*/
+  "--polling_interval [interval] : (optional, default 5.0) how many seconds to wait before\n"
+  "       checking the file for more data after reaching the end?\n"
+  "--url_filename [url_filename] : (optional) filename to write the URL of the server to.\n";
+
 
 entry_buffer   buf;
 char           *line;
@@ -135,23 +150,13 @@ void sigint_handler(int sig_num)
   exit(sig_num);
 }
 
-void sigabort_handler(int sig)
-{
-  void *arr[20];
-  size_t sz;
-
-  sz = backtrace(arr,20);
-  backtrace_symbols_fd(arr,sz,STDERR_FILENO);
-  exit(sig);
-}
-
-PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file)
+PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file, PetscInt port)
 {
   PetscFunctionBeginUser;
   char path[PETSC_MAX_PATH_LEN];
-  sprintf(path,"python3 %s -f %s",server_path,server_input_file);
+  sprintf(path,"python3 %s -f %s -p %d",server_path,server_input_file,port);
   int spawn_error;
-  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s, gonna broadcast %D chars\n",launcher_path,PETSC_MAX_PATH_LEN);
+  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s\n",launcher_path);
   MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,MPI_INFO_NULL,0,PETSC_COMM_SELF,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   PetscFunctionReturn(spawn_error);
@@ -161,8 +166,8 @@ int main(int argc, char **argv)
 {
   PetscErrorCode ierr;
   PetscBag       bag;
-  size_t         buf_capacity,linesize,nread;
-  PetscInt       N,ires,nentry,mypid,rank,size,num_pid,i,*pids;
+  size_t         buf_capacity,linesize;
+  PetscInt       N,ires,nentry,mypid,rank,size,num_pid,i,*pids,flask_port;
   PetscReal      polling_interval;
   char           filename[PETSC_MAX_PATH_LEN],url_filename[PETSC_MAX_PATH_LEN],sawsurl[256];
   char           accept_filename[PETSC_MAX_PATH_LEN], connect_filename[PETSC_MAX_PATH_LEN],
@@ -171,17 +176,15 @@ int main(int argc, char **argv)
     python_server_name[PETSC_MAX_PATH_LEN], python_launcher_name[PETSC_MAX_PATH_LEN];
   MPI_Comm       server_comm;
   FILE           *output;
-  PetscBool      has_filename,has_filename2,ignore_entry,has_accept,has_connect,has_connlat,has_life,has_retrans,has_input_filename;
+  PetscBool      has_filename,has_filename2,ignore_entry,has_accept,has_connect,has_connlat,has_life,has_retrans,has_input_filename,has_port;
   InputType      input_type;
   tcpaccept_entry accept_entry;
   tcpconnect_entry connect_entry;
   tcpconnlat_entry connlat_entry;
   tcplife_entry life_entry;
   tcpretrans_entry retrans_entry;
-  PetscViewer     viewer;
   process_data       *pdata;
   process_data_summary *psumm;
-  //signal(SIGABRT,sigabort_handler);
   ierr = PetscInitialize(&argc,&argv,NULL,help);if (ierr) return ierr;
   ierr = register_mpi_types();CHKERRQ(ierr);
   mypid = getpid();
@@ -221,11 +224,16 @@ int main(int argc, char **argv)
   } else {
     output = stdout;
   }
-  
+
+  flask_port = 5000;
+  ierr = PetscOptionsGetInt(NULL,NULL,"-p",&flask_port,&has_port);CHKERRQ(ierr);
+  if (!has_port) {
+    ierr = PetscOptionsGetInt(NULL,NULL,"--port",&flask_port,&has_port);CHKERRQ(ierr);
+  }
   ignore_entry = PETSC_FALSE;
   N = 10000;
   ierr = PetscOptionsGetInt(NULL,NULL,"--buffer_capacity",&N,&has_filename);CHKERRQ(ierr);
-  polling_interval = 2.5;
+  polling_interval = 5.0;
   ierr = PetscOptionsGetReal(NULL,NULL,"--polling_interval",&polling_interval,&has_filename);
   
   ierr = PetscOptionsGetString(NULL,NULL,"--url_filename",url_filename,PETSC_MAX_PATH_LEN,&has_filename);
@@ -325,7 +333,7 @@ int main(int argc, char **argv)
   if (!rank) {
     // launch server 
     //printf("about to fork\n");
-    ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename);CHKERRQ(ierr);
+    ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
   }
   MPI_Barrier(PETSC_COMM_WORLD);
   /* done with the file; now wait for more data; */
