@@ -248,7 +248,7 @@ int main(int argc, char **argv)
   
   buf_capacity = (size_t)N;
   ierr = buffer_create(&buf,buf_capacity);CHKERRQ(ierr);
-  signal(SIGINT,sigint_handler);
+  //signal(SIGINT,sigint_handler);
   ierr = PetscOptionsGetEnum(NULL,NULL,"-type",InputTypes,(PetscEnum*)&input_type,&has_filename);CHKERRQ(ierr);
   ierr = process_statistics_init(&pstats);CHKERRQ(ierr);
   /* read each file */
@@ -312,6 +312,7 @@ int main(int argc, char **argv)
     } 
   }
 
+  MPI_Barrier(PETSC_COMM_WORLD);
   ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
   
   if (!rank) {
@@ -328,10 +329,11 @@ int main(int argc, char **argv)
     }
   }
 					    
-  MPI_Barrier(PETSC_COMM_WORLD);
+  //MPI_Barrier(PETSC_COMM_WORLD);
   
   if (!rank) {
-    // launch server 
+    // launch server
+    printf("forking server\n");
     ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
   }
   MPI_Barrier(PETSC_COMM_WORLD);

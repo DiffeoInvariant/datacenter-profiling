@@ -911,10 +911,11 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     ierr = PetscCalloc1(summs+nextant,&summaries);CHKERRQ(ierr);
   }
 
+  printf("before gather on rank %d\n",rank);
   MPI_Gather(ssummaries,nitem,MPI_DTYPES[dtype],
 	     summaries,summs,MPI_DTYPES[dtype],
 	     0,PETSC_COMM_WORLD);
-
+  printf("after gather on rank %d\n",rank);
   /* push the new summaries into the buffer */
   if (!rank) {
     for (i=0; i<summs; ++i) {
@@ -942,6 +943,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
   } else {
     ierr = PetscFree(summaries);CHKERRQ(ierr);
   }
+  printf("after gather func on rank %d\n",rank);
   PetscFunctionReturn(0);
 }
 
