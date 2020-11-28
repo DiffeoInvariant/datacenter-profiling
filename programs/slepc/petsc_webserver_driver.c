@@ -333,7 +333,6 @@ int main(int argc, char **argv)
   
   if (!rank) {
     // launch server
-    printf("forking server\n");
     ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
   }
   MPI_Barrier(PETSC_COMM_WORLD);
