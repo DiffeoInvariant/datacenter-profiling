@@ -38,6 +38,7 @@ From: ubuntu:latest
     mkdir -p /tcpconnlat_data
     mkdir -p /tcpretrans_data
     mkdir -p /bin
+    export TZ=America/Los_Angeles && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
     echo "Installing dependencies..."
     apt-get update && apt-get install -y wget build-essential bison cmake flex git libedit-dev libllvm7 llvm-7-dev libclang-7-dev python3.8 python3.8-dev zlib1g-dev python3-pip zlib1g-dev libelf-dev libfl-dev git netperf clang libclang-dev gfortran pkg-config valgrind unzip

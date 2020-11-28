@@ -28,6 +28,7 @@ CFLAGS += -I$(UTILS_DIR)
 
 
 svd: svd.c
+	echo "making svd"
 	$(LINK.c)  -o $@ $^ $(LDLIBS) -lslepc
 
 parsetest: test_parse.c petsc_webserver.c
