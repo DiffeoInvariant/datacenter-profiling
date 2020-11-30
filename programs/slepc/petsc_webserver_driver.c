@@ -20,14 +20,17 @@ static const char help[] = "PETSc webserver: This program periodically reads the
   "Options:\n"
   "--python_server [filename] : (optional, default petsc_webserver_backend.py) filename of Python web server\n"
   "       you want to launch\n"
+  "--python_launcher [filename] : (optional, default ./webserver_launcher) filename of the MPI program that can\n"
+  "       be launched as an MPI child with MPI_Comm_split() with argv 'python3 <python_server> -f <output> -p <port>'\n"
+  "       and will run a webserver on the appropriate port.\n"
   "-file [filename] : (optional if any of --XXX_file are given) input file\n"
   "-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : (required only if -file is given) what sort of\n"
   "       input file is the -file argument?\n"
   "--accept_file [filename] : (optional) file for tcpaccept data\n"
-  "--connect_file [filename] : file for tcpconnect data\n"
-  "--connlat_file [filename] : file for tcpconnlat data\n"
-  "--life_file [filename] : file for tcplife data\n"
-  "--retrans_file [filename] : file for tcpretrans data\n"
+  "--connect_file [filename] : (optional) file for tcpconnect data\n"
+  "--connlat_file [filename] : (optional) file for tcpconnlat data\n"
+  "--life_file [filename] : (optional) file for tcplife data\n"
+  "--retrans_file [filename] : (optional) file for tcpretrans data\n"
   "-o (--output) [filename] : (optional, default stdout) file to output data to\n"
   "-p (--port) [port (int)] : (optional, default 5000) which TCP port to use to serve requests\n"
   "--buffer_capcity [capacity] : (optional, default 10,000) size of the buffer (number of entries)\n"
@@ -238,7 +241,11 @@ int main(int argc, char **argv)
   }
 
   if (has_filename || has_filename2) {
-    if (!rank) {
+    if (strcmp(output_filename,"stdout") == 0) {
+      output = stdout;
+    } else if(strcmp(output_filename,"stderr") == 0) {
+      output = stderr;
+    } else if (!rank) {
       output = fopen(output_filename,"w");
     }
   } else {
@@ -348,12 +355,14 @@ int main(int argc, char **argv)
       fclose(output);
     }
   }
-					    
-  //MPI_Barrier(PETSC_COMM_WORLD);
   
   if (!rank) {
     // launch server
-    ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
+    if (output != stdout && output != stderr) {
+      ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
+    } else {
+      PetscFPrintf(PETSC_COMM_WORLD,stderr,"Must provide an output filename with -o or --output if you want the webserver to launch!\n");
+    }
   }
   MPI_Barrier(PETSC_COMM_WORLD);
   /* done with the file; now wait for more data; */
@@ -406,16 +415,18 @@ int main(int argc, char **argv)
     ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
       
     if (!rank) {
-      //if (output != stdout && output != stderr) {
-      //output = fopen(output_filename,"w");
-      //}
+      if (output != stdout && output != stderr) {
+	output = fopen(output_filename,"w");
+      }
       while (!buffer_empty(&buf)) {
 	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
 	ierr = PetscBagGetData(bag,(void**)&psumm);CHKERRQ(ierr);
 	ierr = summary_view(output,psumm);CHKERRQ(ierr);
 	ierr = buffer_pop(&buf);CHKERRQ(ierr);
       }
-      //fclose(output);
+      if (output != stdout && output != stderr) {
+	fclose(output);
+      }
     }
       
       /* wait for new entries */
