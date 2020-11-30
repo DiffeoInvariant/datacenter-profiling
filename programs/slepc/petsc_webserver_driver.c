@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+#include <execinfo.h>
 
 static const char help[] = "PETSc webserver: This program periodically reads the output of the eBPF programs\n"
   "tcpaccept, tcpconnect, tcpconnlat, tcplife, and tcpretrans, summarizes that data, and stores that data in a\n"
@@ -40,7 +41,18 @@ char           *line;
 file_wrapper   input, accept_input, connect_input, connlat_input, life_input, retrans_input;
 process_statistics pstats;
   
+void handler(int sig) {
+  void *array[10];
+  size_t size;
 
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
 
 PetscErrorCode handle_line(char *line, PetscInt nentry, InputType input_type, PetscInt mypid,
 			   tcpaccept_entry *accept_entry, tcpconnect_entry *connect_entry,
@@ -154,9 +166,17 @@ PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_pa
 {
   PetscFunctionBeginUser;
   char path[PETSC_MAX_PATH_LEN];
+  if (!launcher_path) {
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_NULL,"Must provide non-NULL launcher_path to fork_server()");
+  }
+  if (!server_path) {
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_NULL,"Must provide non-NULL server_path to fork_server()");
+  }
+  if (!server_input_file) {
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_NULL,"Must provide non-NULL server_input_file (the program's output_filename) to fork_server()");
+  }
   sprintf(path,"python3 %s -f %s -p %d",server_path,server_input_file,port);
   int spawn_error;
-  PetscPrintf(PETSC_COMM_WORLD,"Launching at %s\n",launcher_path);
   MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,MPI_INFO_NULL,0,PETSC_COMM_SELF,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   PetscFunctionReturn(spawn_error);
@@ -192,7 +212,7 @@ int main(int argc, char **argv)
   MPI_Comm_size(PETSC_COMM_WORLD,&size);
   line = NULL;
   linesize = 0;
-
+  signal(SIGSEGV,handler);
   has_filename = has_filename2 = ignore_entry = has_accept = has_connect = has_connlat = has_life = has_retrans = has_input_filename = PETSC_FALSE;
 
   ierr = PetscOptionsGetString(NULL,NULL,"--python_server",python_server_name,PETSC_MAX_PATH_LEN,&has_filename);
@@ -324,7 +344,7 @@ int main(int argc, char **argv)
     }
   }
   if (!rank) {
-    if (output != stdout && output != stderr) {
+    if (output && output != stdout && output != stderr) {
       fclose(output);
     }
   }
@@ -386,16 +406,16 @@ int main(int argc, char **argv)
     ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
       
     if (!rank) {
-      if (output != stdout && output != stderr) {
-	output = fopen(output_filename,"w");
-      }
+      //if (output != stdout && output != stderr) {
+      //output = fopen(output_filename,"w");
+      //}
       while (!buffer_empty(&buf)) {
 	ierr = buffer_get_item(&buf,&bag);CHKERRQ(ierr);
 	ierr = PetscBagGetData(bag,(void**)&psumm);CHKERRQ(ierr);
 	ierr = summary_view(output,psumm);CHKERRQ(ierr);
 	ierr = buffer_pop(&buf);CHKERRQ(ierr);
       }
-      fclose(output);
+      //fclose(output);
     }
       
       /* wait for new entries */

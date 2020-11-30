@@ -230,7 +230,7 @@ extern PetscErrorCode process_data_summarize(PetscInt, process_data *, process_d
 				      lhs.latms == rhs.latms && \
 				      lhs.lifems == rhs.lifems)
 
-#define int_equal(lhs,rhs) lhs == rhs
+#define int_equal(lhs,rhs) (lhs == rhs)
 
 static process_data default_pdata = {0,0,0,0,0,0,0,0,0,0.0,0.0,"[unknown]"};
 
