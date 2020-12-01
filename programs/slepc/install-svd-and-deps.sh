@@ -11,7 +11,7 @@ export TZ=America/Los_Angeles && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 echo "Installing dependencies..."
 
-yum update -y && yum install -y gcc gcc-c++ make cmake wget bison flex git libedit-dev libllvm7 llvm-7-devel libclang-7-devel python python3.8 python3.8-devel zlib1g-devel python3-pip libelf-devel libfl-devel netperf gfortran pkg-config valgrind unzip linux-headers-generiv
+yum update -y && yum install -y gcc gcc-c++ make cmake wget bison flex git libedit-dev llvm-toolset-7 python python38 python38-devel zlib1g-devel python3-pip libelf-devel libfl-devel netperf gfortran pkg-config valgrind unzip linux-headers-generiv
 
 pip3 install --upgrade flask jsonpickle
 echo "Installing BCC..."
