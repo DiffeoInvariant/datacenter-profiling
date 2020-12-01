@@ -27,8 +27,8 @@ make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /usr/local/petsc
 export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
     
 echo "Compiling svd program..."
-make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt svd
+make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt svd
 
 echo "Compiling PETSc webserver..."
-make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt webserver
-make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /opt webserver_launcher
+make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt webserver
+make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt webserver_launcher
