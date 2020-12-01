@@ -1,8 +1,8 @@
 #!/bin/bash
 
-export CLUSTER_LOGIN_NODE=$(gcloud compute instances list \\
-			    --zones $CLUSTER_ZONE \\
-			    --filter="name ~ .*login." \\
+export CLUSTER_LOGIN_NODE=$(gcloud compute instances list \
+			    --zones $CLUSTER_ZONE \
+			    --filter="name ~ .*login." \
 			    --format="value(name)" | head -n1)\
 				gcloud compute ssh ${CLUSTER_LOGIN_NODE} --zone $CLUSTER_ZONE
 
