@@ -33,6 +33,7 @@ From: ubuntu:latest
 
 %post
     mkdir -p /tcpaccept_data
+    touch /tcpaccept_data/tcpaccept.log
     mkdir -p /tcpconnect_data
     mkdir -p /tcplife_data
     mkdir -p /tcpconnlat_data
@@ -76,10 +77,10 @@ From: ubuntu:latest
 
 
 %startscript
-    /usr/share/bcc/tools/tcpaccept > tcpaccept_data/tcpaccept.log &
-    /usr/share/bcc/tools/tcpconnect > tcpconnect_data/tcpconnect.log &
-    /usr/share/bcc/tools/tcpconnlat > tcpconnlat_data/tcpconnlat.log &
-    /usr/share/bcc/tools/tcplife > tcplife_data/tcplife.log &
-    /usr/share/bcc/tools/tcpretrans > tcpretrans_data/tcpretrans.log &
+    /usr/share/bcc/tools/tcpaccept > /tcpaccept_data/tcpaccept.log &
+    /usr/share/bcc/tools/tcpconnect > /tcpconnect_data/tcpconnect.log &
+    /usr/share/bcc/tools/tcpconnlat > /tcpconnlat_data/tcpconnlat.log &
+    /usr/share/bcc/tools/tcplife > /tcplife_data/tcplife.log &
+    /usr/share/bcc/tools/tcpretrans > /tcpretrans_data/tcpretrans.log &
     
     
