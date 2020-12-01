@@ -7,6 +7,7 @@ module load singularity/3.6.4
 module load openmpi/4.0.0
 
 singularity pull --name svd.sif shub://DiffeoInvariant/datacenter-profiling
+singularity pull --name sish.sif docker://antoniomika/sish:latest
 
 N=4
 
