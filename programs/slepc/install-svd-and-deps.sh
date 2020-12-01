@@ -16,9 +16,11 @@ yum -y groupinstall "Development Tools"
 yum -y install openssl-devel bzip2-devel libffi-devel
 yum install -y gcc gcc-c++ make cmake wget bison flex git libedit-dev llvm-toolset-7 python zlib1g-devel python3-pip libelf-devel libfl-devel netperf gfortran pkg-config valgrind unzip linux-headers-generiv
 cd /opt && wget https://www.python.org/ftp/python/3.8.3/Python-3.8.3.tgz
-tar xvf Python-3.8.3.tgz && cd Python-3.8.3 && ./configure --enable-optimizations && make -j 12 make altinstall
+tar xvf Python-3.8.3.tgz && cd Python-3.8.3 && ./configure --enable-optimizations && make -j 12 && make altinstall
 
 pip3 install --upgrade flask jsonpickle
+
+cd /
 echo "Installing BCC..."
 git clone https://github.com/iovisor/bcc.git
 mkdir -p bcc/build && cd bcc/build && cmake .. && make && make install && cmake -DPYTHON_CMD=python3 .. && mkdir -p src/python && cd src/python && make && make install
