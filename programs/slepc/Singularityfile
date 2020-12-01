@@ -8,8 +8,8 @@ From: ubuntu:latest
     petsc_webserver_driver.c /opt
     webserver_launcher.c /opt
     Makefile /opt
-    ../../tests/bcsstk32.bin /opt
-    ../../tests/bcsstk32.bin.info /opt
+    bcsstk32.bin /opt
+    bcsstk32.bin.info /opt
     petsc_webserver_backend.py /opt
 
 %environment
