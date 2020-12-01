@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage() {echo "Usage: $0 [-d <cluster-deployment-name>] [-n <cluster-name>] [-r <cluster-region>] [-z <cluster-zone>]" 1>&2; exit 1;}
+usage() { echo "Usage: $0 [-d <cluster-deployment-name>] [-n <cluster-name>] [-r <cluster-region>] [-z <cluster-zone>]" 1>&2; exit 1; }
 
 while getopts ":d:n:r:z:" o; do
     case "${o}" in
