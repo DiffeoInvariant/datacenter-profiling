@@ -11,7 +11,9 @@ export TZ=America/Los_Angeles && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 echo "Installing dependencies..."
 
-yum update -y && yum install centos-release-scl
+yum update -y && yum install -y centos-release-scl
+yum -y groupinstall "Development Tools"
+yum -y install openssl-devel bzip2-devel libffi-devel
 yum install -y gcc gcc-c++ make cmake wget bison flex git libedit-dev llvm-toolset-7 python python38 python38-devel zlib1g-devel python3-pip libelf-devel libfl-devel netperf gfortran pkg-config valgrind unzip linux-headers-generiv
 
 pip3 install --upgrade flask jsonpickle
