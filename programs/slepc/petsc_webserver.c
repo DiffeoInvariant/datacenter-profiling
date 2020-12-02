@@ -908,6 +908,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     if (nextant + summs >= buf->capacity) {
       SETERRQ3(PETSC_COMM_WORLD,1,"Buffer on root has capacity %D, but currently holds %D entries and is being asked to accept %D more! Increase the buffer size on root.",buf->capacity,nextant,nitem);
     }
+    PetscPrintf(PETSC_COMM_WORLD,"Allocating %D entries.\n",summs+nextant);
     ierr = PetscCalloc1(summs+nextant,&summaries);CHKERRQ(ierr);
   }
 
