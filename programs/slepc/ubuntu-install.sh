@@ -24,7 +24,7 @@ make -C bcc/build install
 echo "Installing PETSc and SLEPc..."
 cd /usr/local && git clone -b release https://gitlab.com/petsc/petsc.git petsc && pwd && ls
 cd /usr/local/petsc && ./configure PETSC_ARCH=arch-linux-c-opt --with-debugging=yes --download-scalapack --download-slepc --download-f2cblaslapack=1 COPTFLAGS="-O3 -g -march=native -mtune=native" CXXOPTFLAGS="-O3 -g -march=native -mtune=native" FOPTFLAGS="-O3 -g -march=native -mtune=native" --download-mpich
-make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /usr/local/petsc
+make PETSC_DIR=/usr/local/petsc PETSC_ARCH=arch-linux-c-opt -C /usr/local/petsc -j 24
 export PETSC_DIR=/usr/local/petsc && export PETSC_ARCH=arch-linux-c-opt
     
 echo "Compiling svd program..."
