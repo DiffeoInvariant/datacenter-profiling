@@ -407,7 +407,8 @@ int main(int argc, char **argv)
     if (!pdata) {
       ierr = PetscMalloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
     } else {
-      ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+      ierr = PetscFree(pdata);CHKERRQ(ierr);
+      ierr = PetscMalloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
     }
     ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
 
