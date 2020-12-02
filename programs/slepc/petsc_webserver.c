@@ -901,6 +901,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     nextant = (PetscInt)buf->num_items;
   }
   MPI_Barrier(PETSC_COMM_WORLD);
+  fprintf(stderr,"nitem is %d on rank %d\n",nitem,rank);
   MPI_Reduce(&nitem,&summs,1,MPI_INT,MPI_SUM,0,PETSC_COMM_WORLD);
   //MPI_Gather(&nitem,1,MPI_INT,summs_per_rank,1,MPI_INT,0,PETSC_COMM_WORLD);
 
