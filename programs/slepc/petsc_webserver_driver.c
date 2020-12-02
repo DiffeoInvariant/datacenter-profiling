@@ -399,8 +399,16 @@ int main(int argc, char **argv)
     }
     
     ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
-    ierr = PetscRealloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
-    ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+    if (!pids) {
+      ierr = PetscMalloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
+    } else {
+      ierr = PetscRealloc(num_pid * sizeof(PetscInt),&pids);CHKERRQ(ierr);
+    }
+    if (!pdata) {
+      ierr = PetscMalloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+    } else {
+      ierr = PetscRealloc(num_pid * sizeof(process_data),&pdata);CHKERRQ(ierr);
+    }
     ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
 
     for (i=0; i<num_pid; ++i) {
