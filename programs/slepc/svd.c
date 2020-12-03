@@ -32,7 +32,6 @@ int main(int argc, char **argv)
   PetscErrorCode ierr;
 
   ierr = SlepcInitialize(&argc,&argv,NULL,help);if(ierr) return ierr;
-  fprintf(stderr,"Initialized.\n");
   PetscOptionsGetString(NULL,NULL,"-input",matfile,sizeof(matfile),&flg);
   if (!flg) {
     SETERRQ(PETSC_COMM_WORLD,1,"You must provide an input file (-input)");
@@ -51,6 +50,7 @@ int main(int argc, char **argv)
   PetscOptionsHasName(NULL,NULL,"-print",&print);
   PetscPrintf(PETSC_COMM_WORLD,"Reading matrix from file %s\n",matfile);
   ierr = ReadMatrixFromBinary(PETSC_COMM_WORLD,matfile,&A);CHKERRQ(ierr);
+  MPI_Barrier(PETSC_COMM_WORLD);
   ierr = MatGetSize(A,&rows,&cols);CHKERRQ(ierr);
   PetscPrintf(PETSC_COMM_WORLD,"Read %Dx%D matrix from the file\n",rows,cols);
   nsv = PetscMin(rows,cols);CHKERRQ(ierr);
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
   ierr = SVDSetOperator(svd,A);CHKERRQ(ierr);
   ierr = SVDSetDimensions(svd,nsv,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
   ierr = SVDSetFromOptions(svd);CHKERRQ(ierr);
-  
+  MPI_Barrier(PETSC_COM_WORLD);
   ierr = SVDSolve(svd);CHKERRQ(ierr);
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,evalfile,FILE_MODE_WRITE,&viewer);
