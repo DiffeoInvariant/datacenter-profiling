@@ -280,6 +280,9 @@ int main(int argc, char **argv)
   ierr = process_statistics_init(&pstats);CHKERRQ(ierr);
   /* read each file */
   if (has_input_filename) {
+    if (access(filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",filename);
+    }
     input.file = fopen(filename,"r");
 
     ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,&accept_entry,
@@ -288,6 +291,9 @@ int main(int argc, char **argv)
   } /* if has_input_filename */
 
   if (has_accept) {
+    if (access(accept_filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",accept_filename);
+    }
     accept_input.file = fopen(accept_filename,"r");
     ierr = read_file(accept_input.file,&linesize,&line,&nentry,TCPACCEPT,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
@@ -295,6 +301,9 @@ int main(int argc, char **argv)
   }
 
   if (has_connect) {
+    if (access(connect_filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",connect_filename);
+    }
     connect_input.file = fopen(connect_filename,"r");
     ierr = read_file(connect_input.file,&linesize,&line,&nentry,TCPCONNECT,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
@@ -302,6 +311,9 @@ int main(int argc, char **argv)
   }
 
   if (has_connlat) {
+    if (access(connlat_filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",connlat_filename);
+    }
     connlat_input.file = fopen(connlat_filename,"r");
     ierr = read_file(connlat_input.file,&linesize,&line,&nentry,TCPCONNLAT,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
@@ -309,6 +321,9 @@ int main(int argc, char **argv)
   }
 
   if (has_life) {
+    if (access(life_filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",life_filename);
+    }
     life_input.file = fopen(life_filename,"r");
     ierr = read_file(life_input.file,&linesize,&line,&nentry,TCPLIFE,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
@@ -316,6 +331,9 @@ int main(int argc, char **argv)
   }
 
   if (has_retrans) {
+    if (access(retrans_filename,R_OK) != 0) {
+      SETERRQ1(PETSC_COMM_WORLD,1,"Could not find readable file %s\n",retrans_filename);
+    }
     retrans_input.file = fopen(retrans_filename,"r");
     ierr = read_file(retrans_input.file,&linesize,&line,&nentry,TCPRETRANS,mypid,&accept_entry,
 		     &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
