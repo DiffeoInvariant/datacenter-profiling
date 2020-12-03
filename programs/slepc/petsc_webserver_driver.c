@@ -156,7 +156,7 @@ void sigabrt_handler(int sig_num)
 
   size = backtrace(bt,BACKTRACE_DEPTH);
 
-  fprintf(stderr, "Error on launcher: signal %d:\n", sig);
+  fprintf(stderr, "Error on launcher: signal %d:\n", sig_num);
   backtrace_symbols_fd(bt,size,STDERR_FILENO);  
   PetscFinalize();
   exit(sig_num);
