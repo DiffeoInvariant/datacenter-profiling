@@ -214,8 +214,8 @@ int main(int argc, char **argv)
   MPI_Comm_size(PETSC_COMM_WORLD,&size);
   line = NULL;
   linesize = 0;
-  signal(SIGSEGV,segv_handler);
-  signal(SIGABRT,sigabrt_handler);
+  //signal(SIGSEGV,segv_handler);
+  //signal(SIGABRT,sigabrt_handler);
   has_filename = has_filename2 = ignore_entry = has_accept = has_connect = has_connlat = has_life = has_retrans = has_input_filename = PETSC_FALSE;
 
   ierr = PetscOptionsGetString(NULL,NULL,"--python_server",python_server_name,PETSC_MAX_PATH_LEN,&has_filename);

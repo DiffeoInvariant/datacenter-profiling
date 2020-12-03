@@ -40,7 +40,7 @@ int main(int argc, char **argv)
   MPI_Status stat;
   FILE     *server;
   MPI_Init(&argc,&argv);
-  signal(SIGSEGV,handler);
+  //signal(SIGSEGV,handler);
   MPI_Comm_get_parent(&parent);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   if (parent != MPI_COMM_NULL) {
