@@ -58,7 +58,7 @@ int main(int argc, char **argv)
   ierr = SVDSetOperator(svd,A);CHKERRQ(ierr);
   ierr = SVDSetDimensions(svd,nsv,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
   ierr = SVDSetFromOptions(svd);CHKERRQ(ierr);
-  MPI_Barrier(PETSC_COM_WORLD);
+  MPI_Barrier(PETSC_COMM_WORLD);
   ierr = SVDSolve(svd);CHKERRQ(ierr);
 
   ierr = PetscViewerBinaryOpen(PETSC_COMM_WORLD,evalfile,FILE_MODE_WRITE,&viewer);
