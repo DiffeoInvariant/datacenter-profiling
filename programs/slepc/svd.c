@@ -32,7 +32,7 @@ int main(int argc, char **argv)
   PetscErrorCode ierr;
 
   ierr = SlepcInitialize(&argc,&argv,NULL,help);if(ierr) return ierr;
-
+  fprintf(stderr,"Initialized.\n");
   PetscOptionsGetString(NULL,NULL,"-input",matfile,sizeof(matfile),&flg);
   if (!flg) {
     SETERRQ(PETSC_COMM_WORLD,1,"You must provide an input file (-input)");
