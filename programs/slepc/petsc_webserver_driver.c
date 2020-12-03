@@ -44,16 +44,14 @@ char           *line;
 file_wrapper   input, accept_input, connect_input, connlat_input, life_input, retrans_input;
 process_statistics pstats;
   
-void handler(int sig) {
-  void *array[10];
+void segv_handler(int sig) {
+  void *bt[BACKTRACE_DEPTH];
   size_t size;
 
-  // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
+  size = backtrace(bt,BACKTRACE_DEPTH);
 
-  // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  fprintf(stderr, "Error on launcher: signal %d:\n", sig);
+  backtrace_symbols_fd(bt,size,STDERR_FILENO);
   exit(1);
 }
 
@@ -151,16 +149,15 @@ PetscErrorCode read_file(FILE *fd, size_t *linesize, char **line, PetscInt *nent
   PetscFunctionReturn(0);
 }
 
-void sigint_handler(int sig_num)
+void sigabrt_handler(int sig_num)
 {
-  buffer_destroy(&buf);
-  if (line) {
-    free(line);
-  }
-  if (input.file) {
-    fclose(input.file);
-  }
-  process_statistics_destroy(&pstats);
+  void *bt[BACKTRACE_DEPTH];
+  size_t size;
+
+  size = backtrace(bt,BACKTRACE_DEPTH);
+
+  fprintf(stderr, "Error on launcher: signal %d:\n", sig);
+  backtrace_symbols_fd(bt,size,STDERR_FILENO);  
   PetscFinalize();
   exit(sig_num);
 }
@@ -215,7 +212,8 @@ int main(int argc, char **argv)
   MPI_Comm_size(PETSC_COMM_WORLD,&size);
   line = NULL;
   linesize = 0;
-  signal(SIGSEGV,handler);
+  signal(SIGSEGV,segv_handler);
+  signal(SIGABRT,sigabrt_handler);
   has_filename = has_filename2 = ignore_entry = has_accept = has_connect = has_connlat = has_life = has_retrans = has_input_filename = PETSC_FALSE;
 
   ierr = PetscOptionsGetString(NULL,NULL,"--python_server",python_server_name,PETSC_MAX_PATH_LEN,&has_filename);

@@ -7,16 +7,16 @@
 #include <execinfo.h>
 #include <signal.h>
 
+#define BACKTRACE_DEPTH 20
+
 void handler(int sig) {
-  void *array[10];
+  void *bt[BACKTRACE_DEPTH];
   size_t size;
 
-  // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
+  size = backtrace(bt,BACKTRACE_DEPTH);
 
-  // print out all the frames to stderr
   fprintf(stderr, "Error on launcher: signal %d:\n", sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  backtrace_symbols_fd(bt,size,STDERR_FILENO);
   exit(1);
 }
 
