@@ -1,3 +1,3 @@
 
-localhost slots=24
-worker slots=24
+localhost slots=24 max_slots=24
+worker slots=24 max_lots=24
