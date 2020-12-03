@@ -890,8 +890,8 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
       SETERRQ2(PETSC_COMM_WORLD,1,"Number of items %D on rank %D is greater than INT_MAX! Try sending the buffer with fewer items.",buf->num_items,rank);
     }
     nitem = (PetscInt)buf->num_items;
-    fprintf(stderr,"Rank %d allocating %d ssummaries\n",rank,nitem);
-    ierr = PetscCalloc1(nitem,&ssummaries);CHKERRQ(ierr);
+    //fprintf(stderr,"Rank %d allocating %d ssummaries\n",rank,nitem);
+    ierr = PetscMalloc1(nitem*sizeof(ssummaries),&ssummaries);CHKERRQ(ierr);
     /* fill the array with summaries */
     i=0;
     while (!buffer_empty(buf)) {
@@ -910,7 +910,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     nextant = (PetscInt)buf->num_items;
   }
   MPI_Barrier(PETSC_COMM_WORLD);
-  fprintf(stderr,"nitem is %d on rank %d\n",nitem,rank);
+  //fprintf(stderr,"nitem is %d on rank %d\n",nitem,rank);
   MPI_Reduce(&nitem,&summs,1,MPI_INT,MPI_SUM,0,PETSC_COMM_WORLD);
   //MPI_Gather(&nitem,1,MPI_INT,summs_per_rank,1,MPI_INT,0,PETSC_COMM_WORLD);
 
@@ -919,7 +919,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
       SETERRQ3(PETSC_COMM_WORLD,1,"Buffer on root has capacity %D, but currently holds %D entries and is being asked to accept %D more! Increase the buffer size on root.",buf->capacity,nextant,nitem);
     }
     PetscPrintf(PETSC_COMM_WORLD,"Allocating %D entries on root.\n",summs+nextant);
-    ierr = PetscCalloc1(summs+nextant,&summaries);CHKERRQ(ierr);
+    ierr = PetscMalloc1((summs+nextant) * sizeof(summaries),&summaries);CHKERRQ(ierr);
   }
   fprintf(stderr,"Gathering nitem=%d and summs=%d on rank %d\n",nitem,summs,rank);
   MPI_Gather(ssummaries,nitem,MPI_DTYPES[dtype],
@@ -950,11 +950,15 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
   }
   
   if (rank) {
-    fprintf(stderr,"About to free ssummaries\n");
-    ierr = PetscFree(ssummaries);CHKERRQ(ierr);
+    //fprintf(stderr,"About to free ssummaries\n");
+    if (ssummaries) {
+      ierr = PetscFree(ssummaries);CHKERRQ(ierr);
+    }
   } else {
-    fprintf(stderr,"About to free summaries\n");
-    ierr = PetscFree(summaries);CHKERRQ(ierr);
+    if (summaries) {
+      fprintf(stderr,"About to free summaries\n");
+      ierr = PetscFree(summaries);CHKERRQ(ierr);
+    }
   }
   
   PetscFunctionReturn(0);
