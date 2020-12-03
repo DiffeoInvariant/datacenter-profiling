@@ -49,8 +49,10 @@ int main(int argc, char **argv)
     PetscStrncpy(evecfile,default_evecfile,sizeof(default_evecfile));
   }
   PetscOptionsHasName(NULL,NULL,"-print",&print);
+  PetscPrintf(PETSC_COMM_WORLD,"Reading matrix from file %s\n",matfile);
   ierr = ReadMatrixFromBinary(PETSC_COMM_WORLD,matfile,&A);CHKERRQ(ierr);
   ierr = MatGetSize(A,&rows,&cols);CHKERRQ(ierr);
+  PetscPrintf(PETSC_COMM_WORLD,"Read %Dx%D matrix from the file\n",rows,cols);
   nsv = PetscMin(rows,cols);CHKERRQ(ierr);
   ierr = SVDCreate(PETSC_COMM_WORLD,&svd);
   ierr = SVDSetOperator(svd,A);CHKERRQ(ierr);
