@@ -860,6 +860,14 @@ PetscErrorCode buffer_gather_summaries(entry_buffer *buf)
   PetscFunctionReturn(0);
 }
 
+#define summary_cpy(to,from) \
+  (to).rank = (from).rank;\
+  (to).tx_kb = (from).tx_kb;\
+  (to).rx_kb = (from).rx_kb;\
+  (to).n_event = (from).n_event;\
+  (to).avg_latency = (from).avg_latency;\
+  (to).fraction_ipv6 = (from).fraction_ipv6;\
+  PetscStrncpy((to).comm,(from).comm,COMM_MAX_LEN)
 
 PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
 {
@@ -888,7 +896,7 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     while (!buffer_empty(buf)) {
       ierr = buffer_get_item(buf,&bag);CHKERRQ(ierr);
       ierr = PetscBagGetData(bag,(void**)&summary);CHKERRQ(ierr);
-      ssummaries[i] = *summary;   
+      summary_cpy(ssummaries[i],*summary); //ssummaries[i] = *summary;   
       ierr = buffer_pop(buf);CHKERRQ(ierr);
       ++i;
     }
