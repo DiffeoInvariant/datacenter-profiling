@@ -896,7 +896,8 @@ PetscErrorCode buffer_gather(entry_buffer *buf, SERVER_MPI_DTYPE dtype)
     while (!buffer_empty(buf)) {
       ierr = buffer_get_item(buf,&bag);CHKERRQ(ierr);
       ierr = PetscBagGetData(bag,(void**)&summary);CHKERRQ(ierr);
-      summary_cpy(ssummaries[i],*summary); //ssummaries[i] = *summary;   
+      summary_cpy(ssummaries[i],*summary); //ssummaries[i] = *summary;
+      ssummaries[i].rank = rank;
       ierr = buffer_pop(buf);CHKERRQ(ierr);
       ++i;
     }
