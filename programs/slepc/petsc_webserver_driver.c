@@ -43,7 +43,9 @@ entry_buffer   buf;
 char           *line;
 file_wrapper   input, accept_input, connect_input, connlat_input, life_input, retrans_input;
 process_statistics pstats;
-  
+
+#define BACKTRACE_DEPTH 20
+
 void segv_handler(int sig) {
   void *bt[BACKTRACE_DEPTH];
   size_t size;
