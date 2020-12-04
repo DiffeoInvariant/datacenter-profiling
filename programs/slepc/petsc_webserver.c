@@ -835,7 +835,7 @@ PetscErrorCode create_process_summary_bag(process_data_summary **psumm, PetscBag
   ierr = PetscBagGetData(pbag,(void**)&ps);CHKERRQ(ierr);
   ierr = PetscBagSetName(pbag,obj_name,"A process summary");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt(pbag,&ps->pid,-1,"pid","Process ID");CHKERRQ(ierr);
-  ierr = PetscBagRegisterInt(pbag,&ps->rank,0,"rank","MPI rank");CHKERRQ(ierr);
+  ierr = PetscBagRegisterInt(pbag,&ps->rank,rank,"rank","MPI rank");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->tx_kb,0,"tx_kb","Transmitted kilobytes");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->rx_kb,0,"rx_kb","Received kilobytes");CHKERRQ(ierr);
   ierr = PetscBagRegisterInt64(pbag,&ps->n_event,0,"n_event","Number of TCP events (e.g. connect, accept, life, etc.)");CHKERRQ(ierr);
