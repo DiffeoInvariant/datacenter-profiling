@@ -351,6 +351,8 @@ int main(int argc, char **argv)
   for (i=0; i<num_pid; ++i) {
     ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
     ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
+    fprintf(stderr,"Summary on rank %d:\n",rank);
+    summary_view(stderr,psumm);
     ires = buffer_try_insert(&buf,bag);
     if (ires == -1) {
       PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
