@@ -239,6 +239,7 @@ PETSC_HASH_MAP(HMapData,PetscInt,process_data,PetscHashInt,int_equal,default_pda
 /* sets the values of the process_data to the defaults */
 extern PetscErrorCode process_data_initialize(process_data *);
 
+/* calculates what fraction of all TCP events used IPv6 as opposed to IPv4 */
 extern PetscReal fraction_ipv6(process_data *);
 
 extern PetscErrorCode create_process_data_bag(process_data **, PetscBag *);
@@ -254,7 +255,7 @@ extern PetscErrorCode process_statistics_get_summary(process_statistics *, Petsc
 
 extern PetscErrorCode process_statistics_num_entries(process_statistics *, PetscInt *);
 
-/* second and third parameters are pointers to array of process_data and PetscInt (pid) respectively of length retrieved from process_statistics_num_entries() */
+/* second and third parameters are pointers to array of process_data and PetscInt (pid) respectively, each of the length retrieved from process_statistics_num_entries() */
 extern PetscErrorCode process_statistics_get_all(process_statistics *, process_data *, PetscInt *);
 
 

@@ -1,0 +1,57 @@
+
+The project can be broadly subdivided into 7 components: the eBPF programs, data structures to serialize and efficiently encode their output and summaries of it, an MPI-backed message queue, a REST API and server, the driver programs, an optional containerized version of the program (hosted on Singularity hub) and for testing purposes, cluster setup and installation scripts. Since the project is, with the exception of the REST server, written in C, and the PETSc library provides many of the utilities programmers expect from ``modern'' languages that C doesn't provide, as well as an easy interface to install many useful C libraries through its configure script (and update the relevant environment variables to use those libraries in a makefile), we make heavy use of PETSc in our code. For example, we use a hash map in the form of a PETSc wrapper around a KHash hash map, and our message queue stores \lstinline{PetscBag} instances, which can in turn store any of the data and summary structs we define.
+\subsection*{eBPF Programs}
+Due to time constraints, we used only the five BCC-provided programs mentioned in the first section: \lstinline{tcpaccept(8)}, \lstinline{tcpconnect(8)}, \lstinline{tcpconnlat(8)}, \lstinline{tcplife(8)}, and \lstinline{tcpretrans(8)}. Through a script named \lstinline{collect-tcp-data.sh} that must, at present, be run as root\footnote{Since all eBPF programs must be run as root, although this may change in the future. [CITE Ingo Molnar \url{https://lkml.org/lkml/2015/4/14/232}]}, each of these programs is run in the background with its output redirected to an appropriately named file. This must be done on every node in the cluster before running the program to be profiled; this can be accomplished with OpenMPI on N nodes by running
+\begin{Verbatim}
+sudo mpirun -np N --map-by ppr:1:node --allow-run-as-root ./collect-tcp-data.sh &
+\end{Verbatim}
+from the root node. Every MPI implementation I've seen will warn you that you should not run as root or outright disallows it by default. In OpenMPI, this can be circumvented with the \lstinline{--allow-run-as-root} option. The requirement that the data collection script be run as root presents the most significant limitation of this software: it must be run on a cluster to which the user has root access. \\
+We also define a C struct for each program that can hold the information in one line of output, as well as a C struct to hold data from all the programs collected about an individual process, and one to hold a summary of that process's data.
+\subsection*{Serialization}
+To allow the user to extend the program to collect more sophisticated summaries, each of the above-mentioned C structs can be sent in an MPI message after the user has called the \lstinline{register_mpi_types()} function. This was accomplished with MPI's \lstinline{MPI_Type_create_struct()} and \lstinline{MPI_Type_commit()} functions. By default, the output summaries are stored in plain ASCII text in a file. However, if the user has extremely limited disk space and wants to use a more efficient encoding, then as mentioned above, each of those structs can be serialized in a \lstinline{PetscBag}, which is a C class provided by PETSc that can be used for, among other things, efficiently serializing data in a binary format.
+\subsection*{The Message Queue}
+Our extremely simple message queue is built based on a circular buffer and the \lstinline{MPI_Reduce()} and \lstinline{MPI_Gather()} functions. We decided that it would be easier, both for development but crucially for the end user, to implement a simple message queue with MPI than to integrate a ``standard'' message queue like RabbitMQ or ZeroMQ into our cluster and program setup. Its operation consists of all nodes (possibly including the root node) collecting data and pushing it into their respective buffers, then gathering that data to the root node, clearing the non-root nodes' buffers. Since this operation requires the use of \lstinline{MPI_Reduce()} (to figure out how many items each process is sending so that the root node can allocate enough memory to store them) and \lstinline{MPI_Gather()} (to perform the actual operation), both of which are blocking\footnote{i.e. they block all processes in the communicator until every other process has finished executing the function}, the user does not need to worry about using \lstinline{MPI_Barrier()} to synchronize the communication. This is implemented in the \lstinline{buffer_gather()} function in our code.
+
+\subsection*{Driver Programs}
+There are two C programs that run the code contained in \lstinline{petsc_webserver.h}, \lstinline{petsc_webserver.c}, and \lstinline{petsc_webserver_backend.py}: \lstinline{petsc_webserver_driver.c} and \lstinline{webserver_launcher.c}. The main driver first reads through all the relevant input files and stores the data it reads. It then uses \lstinline{MPI_Comm_spawn()} to spawn a subprocess on the root node (running \lstinline{webserver_launcher.c}) that launches the REST server via the Python C API (specifically, with \lstinline{PyRun_SimpleFile()}). The driver then continues into an infinite loop, where it polls the data files to check if they have new data, and if they do, reads that new data, updates the summaries, then overwrites the old output file with the updated output. The driver program can be run with the following options, produced by running it with the -h (or -help) flag (excluding options common to all PETSc programs, which are also printed out):
+\begin{Verbatim}[xleftmargin=-3cm]
+PETSc webserver: This program periodically reads the output of the eBPF programs
+tcpaccept, tcpconnect, tcpconnlat, tcplife, and tcpretrans, summarizes that data, and stores that
+data in a message queue. The summaries are then gathered to the root node (MPI rank 0), where it is
+written to an output file. Once the existing input files have been read to their ends, the root
+process spawns a new subcommunicator via MPI_Comm_spawn() and launches a Python webserver
+(currently written with Flask) on that spawned process that reads the output file, and serves requests
+to a REST API. Available endpoints are:
+-------------------------------------------------------------------------------------------
+GET /api/get/all (gets data for all processes on all MPI ranks)
+GET /api/get/{rank}/{pid} (gets data for the process with PID {pid} on MPI rank {rank})
+GET /api/get/{name} (gets data on all MPI ranks for all processes with name {name}
+-------------------------------------------------------------------------------------------
+Usage:
+Options:
+--python_server [filename] : (optional, default petsc_webserver_backend.py) filename of Python web server
+       you want to launch
+       --python_launcher [filename] : (optional, default ./webserver_launcher) filename of the MPI program
+              that can be launched as an MPI child with MPI_Comm_split() with argv
+              'python3 <python_server> -f <output> -p <port>' and will run a webserver on the
+              appropriate port.
+-file [filename] : (optional if any of --XXX_file are given) input file
+-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : (required only if -file is given) what
+       sort of input file is the -file argument?
+--accept_file [filename] : (optional) file for tcpaccept data
+--connect_file [filename] : (optional) file for tcpconnect data
+--connlat_file [filename] : (optional) file for tcpconnlat data
+--life_file [filename] : (optional) file for tcplife data
+--retrans_file [filename] : (optional) file for tcpretrans data
+-o (--output) [filename] : (optional, default stdout) file to output data to
+-p (--port) [port (int)] : (optional, default 5000) which TCP port to use to serve requests
+--buffer_capcity [capacity] : (optional, default 10,000) size of the buffer (number of entries)
+--polling_interval [interval] : (optional, default 5.0) how many seconds to wait before
+       checking the file for more data after reaching the end?
+\end{Verbatim}
+Note that the driver MUST be started after TCP data collection has started in order to guarantee that every file the driver reads in exists.
+\subsection*{REST API}
+The Python program launched in the drivers above takes in two command-line options, one (-f) being the file containing its input data (the output of the driver), the other (-p) being the TCP port that Flask should use.
+The endpoints for the REST API are shown in the help message above. Upon receiving a request, the server re-reads the input data (in case it has been updated since the last request), constructs the appropriate response, and responds. I originally intended to use SAWs (Scientific Application Webserver), a library that PETSc integrates with that would have allowed me to bypass the output file and subprocess running the server entirely. However, the PETSc developers haven't written the code necessary to use PetscBag objects with SAWs (which is what I was planning to do), so for the sake of time, since implementing even a very simple function for a library like PETSc can be a significant time investment, we decided to use a Flask-based server for now. In case the user doesn't feel like writing their own REST calls (even though this API is extremely simple, and requests can easily be constructed manually), we have provided a Python-based web client.
+\subsection*{Singularity Container}
+In case the user doesn't want to build the software on their cluster, we have provided the software in the form of a Singularity container at [INSERT SHUB LINK]. Also, if it ever becomes the case that eBPF programs can be run without root privileges, this container will allow the software to be run on clusters whose users do not have root access. 

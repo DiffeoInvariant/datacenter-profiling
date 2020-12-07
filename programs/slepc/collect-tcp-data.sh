@@ -1,5 +1,10 @@
 #!/bin/sh
 
+mkdir -p $HOME/tcpaccept_data
+mkdir -p $HOME/tcpcollect_data
+mkdir -p $HOME/tcpconnlat_data
+mkdir -p $HOME/tcplife_data
+mkdir -p $HOME/tcpretrans_data
 
 /usr/share/bcc/tools/tcpaccept > $HOME/tcpaccept_data/tcpaccept.log &
 /usr/share/bcc/tools/tcpconnect > $HOME/tcpconnect_data/tcpconnect.log &
