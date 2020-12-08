@@ -273,7 +273,7 @@ def get_name_html(name):
     for e in entry:
         html += e.to_html()
     html += '</table>'
-    return good_response(html)
+    return html
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
