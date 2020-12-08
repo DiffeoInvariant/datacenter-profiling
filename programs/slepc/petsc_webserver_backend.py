@@ -98,7 +98,7 @@ class Entry(NamedTuple):
 
     def to_html(self, border=1):
         def data(x):
-            return f'<td>x</td>'
+            return f'<td>{x}</td>'
         html = f'''
 
 <table border="{border}">
