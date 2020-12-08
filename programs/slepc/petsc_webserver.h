@@ -289,7 +289,6 @@ typedef struct {
   FILE *file;
   long offset;
 } file_wrapper;
-/* WARNING: never delete from a file managed by a file_wrapper */
 
 
 extern long get_file_end_offset(file_wrapper *);

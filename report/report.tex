@@ -47,7 +47,7 @@ Due to time constraints, we used only the five BCC-provided programs mentioned i
 \begin{Verbatim}
 sudo mpirun -np N --map-by ppr:1:node --allow-run-as-root ./collect-tcp-data.sh &
 \end{Verbatim}
-from the root node. Every MPI implementation I've seen will warn you that you should not run as root or outright disallows it by default. In OpenMPI, this can be circumvented with the \lstinline{--allow-run-as-root} option. \\
+from the root node. Every MPI implementation I've seen will warn you that you should not run as root or outright disallows it by default. In OpenMPI, this can be circumvented with the \lstinline{--allow-run-as-root} option. The requirement that the data collection script be run as root presents the most significant limitation of this software: it must be run on a cluster to which the user has root access. \\
 We also define a C struct for each program that can hold the information in one line of output, as well as a C struct to hold data from all the programs collected about an individual process, and one to hold a summary of that process's data.
 \subsection*{Serialization}
 To allow the user to extend the program to collect more sophisticated summaries, each of the above-mentioned C structs can be sent in an MPI message after the user has called the \lstinline{register_mpi_types()} function. This was accomplished with MPI's \lstinline{MPI_Type_create_struct()} and \lstinline{MPI_Type_commit()} functions. By default, the output summaries are stored in plain ASCII text in a file. However, if the user has extremely limited disk space and wants to use a more efficient encoding, then as mentioned above, each of those structs can be serialized in a \lstinline{PetscBag}, which is a C class provided by PETSc that can be used for, among other things, efficiently serializing data in a binary format.
@@ -91,8 +91,14 @@ Options:
 --polling_interval [interval] : (optional, default 5.0) how many seconds to wait before
        checking the file for more data after reaching the end?
 \end{Verbatim}
+Note that the driver MUST be started after TCP data collection has started in order to guarantee that every file the driver reads in exists.
 \subsection*{REST API}
 The Python program launched in the drivers above takes in two command-line options, one (-f) being the file containing its input data (the output of the driver), the other (-p) being the TCP port that Flask should use.
+The endpoints for the REST API are shown in the help message above. Upon receiving a request, the server re-reads the input data (in case it has been updated since the last request), constructs the appropriate response, and responds. I originally intended to use SAWs (Scientific Application Webserver), a library that PETSc integrates with that would have allowed me to bypass the output file and subprocess running the server entirely. However, the PETSc developers haven't written the code necessary to use PetscBag objects with SAWs (which is what I was planning to do), so for the sake of time, since implementing even a very simple function for a library like PETSc can be a significant time investment, we decided to use a Flask-based server for now. In case the user doesn't feel like writing their own REST calls (even though this API is extremely simple, and requests can easily be constructed manually), we have provided a Python-based web client.
+\subsection*{Singularity Container}
+In case the user doesn't want to build the software on their cluster, we have provided the software in the form of a Singularity container at [INSERT SHUB LINK]. Also, if it ever becomes the case that eBPF programs can be run without root privileges, this container will allow the software to be run on clusters whose users do not have root access. 
+\subsection*{Cluster Setup Scripts}
+In addition to providing a containerized version of the software, we wrote some shell scripts to install the relevant dependencies and software on an Ubuntu VM. To test the software, we set up two VMs in Chameleon Cloud running Ubuntu 20.04, and, following the guide at \url{https://mpitutorial.com/tutorials/running-an-mpi-cluster-within-a-lan/}, set up a LAN between the two with ssh, with a distributed filesystem running NFS that we used to retreive debugging information from the non-root node, as well as distributing the executable among the nodes.
 % Capabilities and Limitations
 \section{Capabilities and Limitations}
 
@@ -392,7 +398,6 @@ typedef struct {
   FILE *file;
   long offset;
 } file_wrapper;
-/* WARNING: never delete from a file managed by a file_wrapper */
 
 
 extern long get_file_end_offset(file_wrapper *);
