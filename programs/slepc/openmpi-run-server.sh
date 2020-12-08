@@ -18,4 +18,4 @@ done
 shift $((OPTIND-1))
 	    
 
-mpirun -n ${n} --map-by node --hostfile hostfile ./webserver --accept_file $ACCEPT_DATA --connect_file $CONNECT_DATA --connlat_file $CONNLAT_DATA --life_file $LIFE_DATA
+/opt/ompi/bin/mpirun -n ${n} --map-by node --hostfile hostfile ./webserver --accept_file $ACCEPT_DATA --connect_file $CONNECT_DATA --connlat_file $CONNLAT_DATA --life_file $LIFE_DATA
