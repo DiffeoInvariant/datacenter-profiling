@@ -287,7 +287,7 @@ def get_name_html(name):
 @app.route('/names',methods=['GET'])
 def get_names():
     read_file(datafile)
-    html = table([('Process Name',nm) for nm in entries_by_name])
+    html = table([('',nm) for nm in entries_by_name])
     return html
 
 if __name__ == '__main__':
