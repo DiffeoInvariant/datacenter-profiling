@@ -186,6 +186,7 @@ PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_pa
   int spawn_error;
   MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,info,0,PETSC_COMM_SELF,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
+  MPI_Info_free(&info);
   PetscFunctionReturn(spawn_error);
 }
 
