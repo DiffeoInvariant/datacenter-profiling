@@ -368,6 +368,7 @@ int main(int argc, char **argv)
     } 
   }
 
+  MPI_Barrier(PETSC_COMM_WORLD);
   ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
   
   if (!rank) {
