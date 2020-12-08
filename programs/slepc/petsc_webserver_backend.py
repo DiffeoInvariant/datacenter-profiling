@@ -188,7 +188,15 @@ def make_entry_table():
 
     html += '</table>'
     return html
-        
+
+
+def table(entry_pairs):
+    html = '<table>\n'
+    for (k,v) in entry_pairs:
+        html += f'<tr><td>{k}</td><td>{v}</td></tr>\n'
+
+    html += '</table>'
+    return html
 
 def get_max(attr):
     return max(entries.values(),key=operator.attrgetter(attr))
@@ -273,6 +281,13 @@ def get_name_html(name):
     for e in entry:
         html += e.to_html()
     html += '</table>'
+    return html
+
+
+@app.route('/names',methods=['GET'])
+def get_names():
+    read_file(datafile)
+    html = table([('Process Name',nm) for nm in entries_by_name])
     return html
 
 if __name__ == '__main__':
