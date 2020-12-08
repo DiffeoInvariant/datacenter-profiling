@@ -393,7 +393,6 @@ int main(int argc, char **argv)
       PetscFPrintf(PETSC_COMM_WORLD,stderr,"Must provide an output filename with -o or --output if you want the webserver to launch!\n");
     }
   }
-  MPI_Barrier(PETSC_COMM_WORLD);
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
     if (has_input_filename && has_new_data(&input)) {
