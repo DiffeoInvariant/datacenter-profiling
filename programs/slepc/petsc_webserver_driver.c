@@ -185,7 +185,7 @@ PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_pa
   MPI_Info_set(info,"host",webserver_host);
   sprintf(path,"python3 %s -f %s -p %d",server_path,server_input_file,port);
   int spawn_error;
-  MPI_Comm_dup(MPI_COMM_WORLD,&newcomm);
+  MPI_Comm_dup(MPI_COMM_SELF,&newcomm);
   MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,info,0,newcomm,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   MPI_Info_free(&info);
