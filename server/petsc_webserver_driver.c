@@ -397,7 +397,7 @@ int main(int argc, char **argv)
   }
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
-    fprintf(stderr,"Starting loop on rank %d.\n");
+    fprintf(stderr,"Starting loop on rank %d.\n",rank);
     if (has_input_filename && has_new_data(&input)) {
       ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,
 		       &accept_entry, &connect_entry,&connlat_entry,&life_entry,
@@ -407,7 +407,7 @@ int main(int argc, char **argv)
       ierr = read_file(accept_input.file,&linesize,&line,&nentry,TCPACCEPT,mypid,&accept_entry,
 		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
 		       &ignore_entry,&pstats);CHKERRQ(ierr);
-    }
+    } 
     if (has_connect && has_new_data(&connect_input)) {
       ierr = read_file(connect_input.file,&linesize,&line,&nentry,TCPCONNECT,mypid,&accept_entry,
 		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
