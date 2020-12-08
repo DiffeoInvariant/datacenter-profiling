@@ -29,12 +29,12 @@ GET /api/get/{name} (gets data on all MPI ranks for all processes with name {nam
 -------------------------------------------------------------------------------------------
 Usage:
 Options:
---python_server [filename] : (optional, default petsc_webserver_backend.py) filename of Python web server
+--python_server [filename] : (optional, default petsc_webserver_frontend.py) filename of Python web server
        you want to launch
-       --python_launcher [filename] : (optional, default ./webserver_launcher) filename of the MPI program
-              that can be launched as an MPI child with MPI_Comm_split() with argv
-              'python3 <python_server> -f <output> -p <port>' and will run a webserver on the
-              appropriate port.
+--python_launcher [filename] : (optional, default ./webserver_launcher) filename of the MPI program
+        that can be launched as an MPI child with MPI_Comm_split() with argv
+        'python3 <python_server> -f <output> -p <port>' and will run a webserver on the
+         appropriate port.
 -file [filename] : (optional if any of --XXX_file are given) input file
 -type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : (required only if -file is given) what
        sort of input file is the -file argument?
@@ -49,7 +49,8 @@ Options:
 --polling_interval [interval] : (optional, default 5.0) how many seconds to wait before
        checking the file for more data after reaching the end?
 \end{Verbatim}
-Note that the driver MUST be started after TCP data collection has started in order to guarantee that every file the driver reads in exists.
+Note that the driver MUST be started after TCP data collection has started in order to guarantee that every file the driver reads in exists.\\
+I chose this design because I want this software to be as portable as it can be across different clusters, so I tried to rely as little as possible on anything outside of the C standard, POSIX (since eBPF requires a modern linux kernel anyway), the MPI standard or PETSc. However, one notable drawback is that I can't do online updates of the server frontend because it's launched from MPI_Comm_spawn
 \subsection*{REST API}
 The Python program launched in the drivers above takes in two command-line options, one (-f) being the file containing its input data (the output of the driver), the other (-p) being the TCP port that Flask should use.
 The endpoints for the REST API are shown in the help message above. Upon receiving a request, the server re-reads the input data (in case it has been updated since the last request), constructs the appropriate response, and responds. I originally intended to use SAWs (Scientific Application Webserver), a library that PETSc integrates with that would have allowed me to bypass the output file and subprocess running the server entirely. However, the PETSc developers haven't written the code necessary to use PetscBag objects with SAWs (which is what I was planning to do), so for the sake of time, since implementing even a very simple function for a library like PETSc can be a significant time investment, we decided to use a Flask-based server for now. In case the user doesn't feel like writing their own REST calls (even though this API is extremely simple, and requests can easily be constructed manually), we have provided a Python-based web client.

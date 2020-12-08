@@ -354,23 +354,20 @@ int main(int argc, char **argv)
 
 
   ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
-  /* done with input files */
+  /* done with input files, summarize data */
   ierr = PetscCalloc1(num_pid,&pids);CHKERRQ(ierr);
   ierr = PetscCalloc1(num_pid,&pdata);CHKERRQ(ierr);
-  //ierr = PetscCalloc1(num_pid,&psumm);CHKERRQ(ierr);
+
   ierr = process_statistics_get_all(&pstats,pdata,pids);CHKERRQ(ierr);
   for (i=0; i<num_pid; ++i) {
     ierr = create_process_summary_bag(&psumm,&bag,rank,i);CHKERRQ(ierr);
     ierr = process_data_summarize(pids[i],&pdata[i],psumm);CHKERRQ(ierr);
-    //fprintf(stderr,"Summary on rank %d:\n",rank);
-    //summary_view(stderr,psumm);
     ires = buffer_try_insert(&buf,bag);
     if (ires == -1) {
       PetscFPrintf(PETSC_COMM_WORLD,stderr,"Error: buffer is full! Try increasing the capacity. Discarding this entry with pid %D and comm %s\n.",pids[i],psumm->comm);
     } 
   }
 
-  MPI_Barrier(PETSC_COMM_WORLD);
   ierr = buffer_gather_summaries(&buf);CHKERRQ(ierr);
   
   if (!rank) {
