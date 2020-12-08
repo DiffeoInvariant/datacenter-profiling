@@ -168,6 +168,7 @@ void sigabrt_handler(int sig_num)
 
 PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file, char *webserver_host, PetscInt port)
 {
+  MPI_Comm newcomm;
   MPI_Info info;
   PetscFunctionBeginUser;
   char path[PETSC_MAX_PATH_LEN];
@@ -184,7 +185,8 @@ PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_pa
   MPI_Info_set(info,"host",webserver_host);
   sprintf(path,"python3 %s -f %s -p %d",server_path,server_input_file,port);
   int spawn_error;
-  MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,info,0,PETSC_COMM_SELF,inter,&spawn_error);
+  MPI_Comm_dup(PETSC_COMM_SELF,&newcomm);
+  MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,info,0,newcomm,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   MPI_Info_free(&info);
   PetscFunctionReturn(spawn_error);
