@@ -22,6 +22,8 @@ static const char help[] = "PETSc webserver: This program periodically reads the
   "       you want to launch\n"
   "--python_launcher [filename] : (optional, default ./webserver_launcher) filename of the MPI program that can\n"
   "       be launched as an MPI child with MPI_Comm_split() with argv 'python3 <python_server> -f <output> -p <port>'\n"
+  "--webserver_host [filename] : (optional, default ubuntu-mpi-1) hostname of\n"
+  "       the machine that should run the webserver program.\n"
   "       and will run a webserver on the appropriate port.\n"
   "-file [filename] : (optional if any of --XXX_file are given) input file\n"
   "-type [TCPACCEPT,TCPCONNECT,TCPRETRANS,TCPLIFE,TCPCONNLAT] : (required only if -file is given) what sort of\n"
@@ -164,8 +166,9 @@ void sigabrt_handler(int sig_num)
   exit(sig_num);
 }
 
-PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file, PetscInt port)
+PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_path, char *server_input_file, char *webserver_host, PetscInt port)
 {
+  MPI_Info info;
   PetscFunctionBeginUser;
   char path[PETSC_MAX_PATH_LEN];
   if (!launcher_path) {
@@ -177,9 +180,11 @@ PetscErrorCode fork_server(MPI_Comm *inter, char *launcher_path, char *server_pa
   if (!server_input_file) {
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_NULL,"Must provide non-NULL server_input_file (the program's output_filename) to fork_server()");
   }
+  MPI_Info_create(&info);
+  MPI_Info_set(info,"host",webserver_host);
   sprintf(path,"python3 %s -f %s -p %d",server_path,server_input_file,port);
   int spawn_error;
-  MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,MPI_INFO_NULL,0,PETSC_COMM_SELF,inter,&spawn_error);
+  MPI_Comm_spawn(launcher_path,MPI_ARGV_NULL,1,info,0,PETSC_COMM_SELF,inter,&spawn_error);
   MPI_Send(path,PETSC_MAX_PATH_LEN,MPI_CHAR,0,0,*inter);
   PetscFunctionReturn(spawn_error);
 }
@@ -195,7 +200,8 @@ int main(int argc, char **argv)
   char           accept_filename[PETSC_MAX_PATH_LEN], connect_filename[PETSC_MAX_PATH_LEN],
                  connlat_filename[PETSC_MAX_PATH_LEN], output_filename[PETSC_MAX_PATH_LEN],
                  life_filename[PETSC_MAX_PATH_LEN], retrans_filename[PETSC_MAX_PATH_LEN],
-    python_server_name[PETSC_MAX_PATH_LEN], python_launcher_name[PETSC_MAX_PATH_LEN];
+    python_server_name[PETSC_MAX_PATH_LEN], python_launcher_name[PETSC_MAX_PATH_LEN],
+    webserver_host[PETSC_MAX_PATH_LEN];
   MPI_Comm       server_comm;
   FILE           *output;
   PetscBool      has_filename,has_filename2,ignore_entry,has_accept,has_connect,has_connlat,has_life,has_retrans,has_input_filename,has_port;
@@ -225,6 +231,10 @@ int main(int argc, char **argv)
   ierr = PetscOptionsGetString(NULL,NULL,"--python_launcher",python_launcher_name,PETSC_MAX_PATH_LEN,&has_filename);
   if (!has_filename) {
     strcpy(python_launcher_name,"./webserver_launcher");
+  }
+  ierr = PetscOptionsGetString(NULL,NULL,"--webserver_host",webserver_host,PETSC_MAX_PATH_LEN,&has_filename);CHKERRQ(ierr);
+  if (!has_filename) {
+    strcpy(webserver_host,"ubuntu-mpi-1");
   }
   ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_input_filename);CHKERRQ(ierr);
   ierr = PetscOptionsGetString(NULL,NULL,"--accept_file",accept_filename,PETSC_MAX_PATH_LEN,&has_accept);CHKERRQ(ierr);
@@ -379,7 +389,7 @@ int main(int argc, char **argv)
   if (!rank) {
     // launch server
     if (output != stdout && output != stderr) {
-      ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,flask_port);CHKERRQ(ierr);
+      ierr = fork_server(&server_comm,python_launcher_name,python_server_name,output_filename,webserver_host,flask_port);CHKERRQ(ierr);
     } else {
       PetscFPrintf(PETSC_COMM_WORLD,stderr,"Must provide an output filename with -o or --output if you want the webserver to launch!\n");
     }
