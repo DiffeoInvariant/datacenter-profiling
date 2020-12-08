@@ -106,6 +106,12 @@ class Entry(NamedTuple):
     {data('Process Name')}{data(self.name)}
   </tr>
   <tr>
+    {data('MPI Rank')}{data(self.rank)}
+  </tr>
+  <tr>
+    {data('PID')}{data(self.pid)}
+  </tr>
+  <tr>
     {data('Transmitted kB')}{data(self.tx_kb)}
   </tr>
   <tr>
@@ -180,6 +186,7 @@ def make_entry_table():
         for pid in entries[rk]:
             html += entries[rk][pid].to_html()
 
+    html += '</table>'
     return html
         
 
@@ -255,6 +262,18 @@ def get_name(name):
     resp = [e.formatted() for e in entry]
     return good_response(resp)
 
+@app.route('/<name>',methods=['GET'])
+def get_name_html(name):
+    read_file(datafile)
+    try:
+        entry = entries_by_name[name]
+    except KeyError:
+        return key_not_found_response(name,'entries_by_name')
+    html = '<table>\n'
+    for e in entry:
+        html += e.to_html()
+    html += '</table>'
+    return good_response(html)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
