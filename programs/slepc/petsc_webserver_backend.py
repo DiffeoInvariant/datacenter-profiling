@@ -96,6 +96,38 @@ class Entry(NamedTuple):
     def __str__(self):
         return self.formatted()
 
+    def to_html(self, border=1):
+        def data(x):
+            return f'<td>x</td>'
+        html = f'''
+
+<table border="{border}">
+  <tr>
+    {data('Process Name')}{data(self.name)}
+  </tr>
+  <tr>
+    {data('Transmitted kB')}{data(self.tx_kb)}
+  </tr>
+  <tr>
+    {data('Received kB')}{data(self.rx_kb)}
+  </tr>
+  <tr>
+    {data('Num TCP Data Events')}{data(self.nevent)}
+  </tr>
+  <tr>
+    {data('Average Connection Latency (ms)')}{data(self.avg_lat)}
+  </tr>
+  <tr>
+    {data('Average Connection Lifetime (ms)')}{data(self.avg_life)}
+  </tr>
+  <tr>
+    {data('Percent IPv6')}{data(f'{self.pct_ipv6:2.2f}')}
+  </tr>
+</table>
+
+        '''
+        return html
+
     def formatted(self):
         fstr = f"""
 _________________________________________________________________
@@ -142,6 +174,14 @@ def format_entries():
 
     return '\n'.join(entry_ls)
 
+def make_entry_table():
+    html = '<table>\n'
+    for rk in entries:
+        for pid in entries[rk]:
+            html += entries[rk][pid].to_html()
+
+    return html
+        
 
 def get_max(attr):
     return max(entries.values(),key=operator.attrgetter(attr))
@@ -169,7 +209,7 @@ def get_max_lifetime():
 @app.route('/')
 def root():
     read_file(datafile)
-    return format_entries()
+    return make_entry_table()
 
 
 def good_response(resp):
