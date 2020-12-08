@@ -395,6 +395,7 @@ int main(int argc, char **argv)
   }
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
+    fprintf(stderr,"Starting loop on rank %d.\n");
     if (has_input_filename && has_new_data(&input)) {
       ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,
 		       &accept_entry, &connect_entry,&connlat_entry,&life_entry,
