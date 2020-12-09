@@ -236,7 +236,12 @@ int main(int argc, char **argv)
   }
   ierr = PetscOptionsGetString(NULL,NULL,"--webserver_host",webserver_host,PETSC_MAX_PATH_LEN,&has_filename);CHKERRQ(ierr);
   if (!has_filename) {
-    strcpy(webserver_host,"ubuntu-mpi-1");
+    if (!rank) {
+      ierr = gethostname(webserver_host,PETSC_MAX_PATH_LEN);
+      if (ierr) {
+	SETERRQ1(PETSC_COMM_WORLD,ierr,"Cannot determine hostname on rank 0!\n");
+      }
+    }
   }
   ierr = PetscOptionsGetString(NULL,NULL,"-file",filename,PETSC_MAX_PATH_LEN,&has_input_filename);CHKERRQ(ierr);
   ierr = PetscOptionsGetString(NULL,NULL,"--accept_file",accept_filename,PETSC_MAX_PATH_LEN,&has_accept);CHKERRQ(ierr);
@@ -415,7 +420,7 @@ int main(int argc, char **argv)
       ierr = read_file(retrans_input.file,&linesize,&line,&nentry,TCPRETRANS,mypid,&accept_entry,
 		       &connect_entry,&connlat_entry,&life_entry,&retrans_entry,
 		       &ignore_entry,&pstats);CHKERRQ(ierr);
-    }
+    } 
     
     ierr = process_statistics_num_entries(&pstats,&num_pid);CHKERRQ(ierr);
     if (!pids) {

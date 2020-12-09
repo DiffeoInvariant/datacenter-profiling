@@ -1,5 +1,4 @@
 #!/bin/bash
-#SBATCH -n 4
 
 
 module load gcc/8.2.0
