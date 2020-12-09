@@ -37,8 +37,7 @@ static const char help[] = "PETSc webserver: This program periodically reads the
   "-p (--port) [port (int)] : (optional, default 5000) which TCP port to use to serve requests\n"
   "--buffer_capcity [capacity] : (optional, default 10,000) size of the buffer (number of entries)\n"
   "--polling_interval [interval] : (optional, default 5.0) how many seconds to wait before\n"
-  "       checking the file for more data after reaching the end?\n"
-  "--url_filename [url_filename] : (optional) filename to write the URL of the server to.\n";
+  "       checking the file for more data after reaching the end?\n";
 
 
 entry_buffer   buf;
@@ -276,16 +275,6 @@ int main(int argc, char **argv)
   polling_interval = 5.0;
   ierr = PetscOptionsGetReal(NULL,NULL,"--polling_interval",&polling_interval,&has_filename);
   
-  ierr = PetscOptionsGetString(NULL,NULL,"--url_filename",url_filename,PETSC_MAX_PATH_LEN,&has_filename);
-  if (!rank) {
-    if (has_filename) {
-      FILE *url_file;
-      url_file = fopen(url_filename,"w");
-      fprintf(url_file,"%s\n",sawsurl);
-      fclose(url_file);
-    }
-  }
-  
   buf_capacity = (size_t)N;
   ierr = buffer_create(&buf,buf_capacity);CHKERRQ(ierr);
   //signal(SIGINT,sigint_handler);
@@ -397,7 +386,6 @@ int main(int argc, char **argv)
   }
   /* done with the file; now wait for more data; */
   while (PETSC_TRUE) {
-    fprintf(stderr,"Starting loop on rank %d.\n",rank);
     if (has_input_filename && has_new_data(&input)) {
       ierr = read_file(input.file,&linesize,&line,&nentry,input_type,mypid,
 		       &accept_entry, &connect_entry,&connlat_entry,&life_entry,
