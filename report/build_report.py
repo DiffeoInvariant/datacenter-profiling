@@ -2,7 +2,7 @@ from pytex import TestReport, Section, Subsection, Image, Figure, CodeSnippet, U
 
 
 report = TestReport('report.tex')
-report.set_title('CSCI 5253 Final Project Report',author='Zane Jakobs',use_date=True)
+report.set_title('CSCI 5253 Final Project Report',author='Emily Jakobs',use_date=True)
 report.add_required_packages((UsePackage('url'),UsePackage('listings'),UsePackage('fancyvrb')))
 report.append(Section.from_file('overview.tex','Overview And Goals'))
 report.append(Section.from_file('components.tex','Description of Components'))
